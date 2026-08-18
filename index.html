@@ -4,134 +4,42 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.3</title>
+<title>One Piece Card Vault 0.3.1</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
-:root{--bg:#0b1324;--panel:#121d33;--panel2:#182640;--text:#f5f7fb;--muted:#9eabc0;--accent:#35b8ff;--ok:#69d39b;--danger:#ff6b6b}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#08101f,#101b31 55%,#0b1324);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.app{max-width:760px;margin:auto;padding:18px 14px 42px}.hero{padding:10px 4px 16px}.title{font-size:27px;font-weight:900}.sub{color:var(--muted);margin-top:3px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat,.panel{background:var(--panel);border:1px solid #233454;border-radius:16px}.stat{padding:12px 9px}.stat b{display:block;font-size:21px}.stat span{font-size:11px;color:var(--muted)}.panel{padding:14px;margin-top:12px}h2{font-size:17px;margin:0 0 10px}.scanner{border:1px dashed #3a638d;border-radius:14px;padding:12px;background:#0c1729}video{width:100%;max-height:360px;object-fit:cover;border-radius:12px;background:#050a12;display:none}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions button{flex:1;min-width:130px}button,input{font:inherit}button{border:0;border-radius:11px;padding:11px 12px;font-weight:800}.primary{background:var(--accent);color:#03111d}.secondary{background:#243655;color:white}.danger{background:#4a2028;color:#ffd9dd}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;background:#0d172a;color:white;border:1px solid #304362;border-radius:11px;padding:11px}.hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}.ok{color:var(--ok)}.progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:9px;display:none}.bar{height:100%;background:var(--accent);width:0}.toolbar{display:flex;gap:8px}.toolbar input{flex:1}.card{display:flex;gap:9px;align-items:center;padding:10px 0;border-bottom:1px solid #253653}.info{flex:1;min-width:0}.name{font-weight:800}.meta{font-size:11px;color:var(--muted)}.qty{display:flex;align-items:center;gap:4px}.qty button{width:32px;height:32px;padding:0}.qty b{min-width:24px;text-align:center}.empty{text-align:center;color:var(--muted);padding:20px}.footer{text-align:center;color:#71819b;font-size:11px;margin-top:16px}.thumb{width:48px;height:66px;object-fit:cover;border-radius:6px;background:#223653}.small{font-size:11px;color:var(--muted)}
-@media(max-width:520px){.grid{grid-template-columns:1fr}.stats{gap:6px}}
-</style>
-</head>
-<body>
-<div class="app">
-<div class="hero"><div class="title">🏴‍☠️ One Piece Card Vault</div><div class="sub">0.3 · Scanner-Test für OP15 und weitere Sets</div></div>
+:root{--panel:#121d33;--text:#f5f7fb;--muted:#9eabc0;--accent:#35b8ff;--ok:#69d39b;--danger:#ff6b6b}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(160deg,#08101f,#101b31 55%,#0b1324);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.app{max-width:760px;margin:auto;padding:18px 14px 42px}.hero{padding:10px 4px 16px}.title{font-size:27px;font-weight:900}.sub{color:var(--muted);margin-top:3px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat,.panel{background:var(--panel);border:1px solid #233454;border-radius:16px}.stat{padding:12px 9px}.stat b{display:block;font-size:21px}.stat span{font-size:11px;color:var(--muted)}.panel{padding:14px;margin-top:12px}h2{font-size:17px;margin:0 0 10px}.scanner{border:1px dashed #3a638d;border-radius:14px;padding:12px;background:#0c1729}video,#preview{width:100%;max-height:360px;object-fit:contain;border-radius:12px;background:#050a12}video{display:none}#preview{display:none;margin-top:9px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions button{flex:1;min-width:130px}button,input{font:inherit}button{border:0;border-radius:11px;padding:11px 12px;font-weight:800}.primary{background:var(--accent);color:#03111d}.secondary{background:#243655;color:white}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;background:#0d172a;color:white;border:1px solid #304362;border-radius:11px;padding:11px}.hint{font-size:12px;color:var(--muted);line-height:1.45;margin-top:8px}.ok{color:var(--ok)}.progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:9px;display:none}.bar{height:100%;background:var(--accent);width:0}.toolbar{display:flex;gap:8px}.toolbar input{flex:1}.card{display:flex;gap:9px;align-items:center;padding:10px 0;border-bottom:1px solid #253653}.info{flex:1;min-width:0}.name{font-weight:800}.meta{font-size:11px;color:var(--muted)}.qty{display:flex;align-items:center;gap:4px}.qty button{width:32px;height:32px;padding:0}.qty b{min-width:24px;text-align:center}.empty{text-align:center;color:var(--muted);padding:20px}.footer{text-align:center;color:#71819b;font-size:11px;margin-top:16px}@media(max-width:520px){.grid{grid-template-columns:1fr}.stats{gap:6px}}
+</style></head><body><div class="app">
+<div class="hero"><div class="title">🏴‍☠️ One Piece Card Vault</div><div class="sub">0.3.1 · verbesserter Nummern-Scanner</div></div>
 <div class="stats"><div class="stat"><b id="total">0</b><span>Karten gesamt</span></div><div class="stat"><b id="unique">0</b><span>verschiedene</span></div><div class="stat"><b id="dupes">0</b><span>Doppelte</span></div></div>
-
 <section class="panel"><h2>📷 Scanner</h2><div class="scanner">
-<video id="video" autoplay playsinline></video><canvas id="canvas" hidden></canvas>
+<video id="video" autoplay playsinline></video><canvas id="canvas" hidden></canvas><img id="preview" alt="Scan-Ausschnitt">
 <input id="photo" type="file" accept="image/*" capture="environment" hidden>
 <div class="actions"><button class="primary" id="openCam">Kamera öffnen</button><button class="secondary" id="pickPhoto">Foto wählen</button></div>
 <div class="actions" id="camBtns" style="display:none"><button class="primary" id="snap">Jetzt scannen</button><button class="secondary" id="closeCam">Schließen</button></div>
-<div class="progress" id="prog"><div class="bar" id="bar"></div></div>
-<div class="hint" id="status">Halte eine Karte möglichst gerade ins Bild. Wichtig ist die Kartennummer unten, z. B. OP15-018.</div>
+<div class="progress" id="prog"><div class="bar" id="bar"></div></div><div class="hint" id="status">0.3.1 liest nicht mehr die ganze Karte, sondern vergrößert gezielt den unteren Kartenbereich.</div>
 </div></section>
-
-<section class="panel"><h2>🃏 Erkannte Karte</h2><div class="grid">
-<div><label>Kartennummer</label><input id="number" placeholder="OP15-018"></div>
-<div><label>Name</label><input id="name" placeholder="wird nach Möglichkeit ergänzt"></div>
-<div><label>Set</label><input id="set" placeholder="OP15"></div>
-<div><label>Seltenheit</label><input id="rarity" placeholder="C / UC / R / SR"></div>
-<div><label>Anzahl hinzufügen</label><input id="addqty" type="number" min="1" value="1"></div>
-<div><label>Notiz</label><input id="note" placeholder="optional"></div>
-</div>
-<div class="actions"><button class="primary" id="lookupBtn">🔎 Daten laden</button><button class="primary" id="saveCard">➕ Speichern / +1</button></div>
-<div class="hint" id="lookup"></div></section>
-
-<section class="panel"><h2>🔎 Sammlung</h2><div class="toolbar"><input id="search" placeholder="Name, Nummer oder Set suchen…"></div><div id="list"></div></section>
-<section class="panel"><h2>💾 Sicherung</h2><div class="actions"><button class="secondary" id="backup">Backup JSON</button><button class="secondary" id="csv">CSV exportieren</button></div><div class="hint">Deine Daten werden unter demselben Browser-Speicher wie bisher geführt.</div></section>
-<div class="footer">Scanner 0.3 · OCR läuft direkt im Browser. Die Kartendaten werden bei Bedarf von OPTCG API geladen.</div>
-</div>
+<section class="panel"><h2>🃏 Erkannte Karte</h2><div class="grid"><div><label>Kartennummer</label><input id="number" placeholder="OP15-018"></div><div><label>Name</label><input id="name" placeholder="wird nach Möglichkeit geladen"></div><div><label>Set</label><input id="set" placeholder="OP15"></div><div><label>Seltenheit</label><input id="rarity" placeholder="C / UC / R / SR"></div><div><label>Anzahl hinzufügen</label><input id="addqty" type="number" min="1" value="1"></div><div><label>Notiz</label><input id="note" placeholder="optional"></div></div><div class="actions"><button class="primary" id="saveCard">➕ Speichern / +1</button></div><div class="hint" id="lookup"></div></section>
+<section class="panel"><h2>🔎 Sammlung</h2><div class="toolbar"><input id="search" placeholder="Suchen…"></div><div id="list"></div></section>
+<section class="panel"><h2>💾 Sicherung</h2><div class="actions"><button class="secondary" id="backup">Backup JSON</button><button class="secondary" id="csv">CSV exportieren</button></div><div class="hint">Deine bestehenden Daten bleiben im selben Browser-Speicher erhalten.</div></section>
+<div class="footer">OCR 0.3.1: mehrere vergrößerte Ausschnitte + Kontrast + Zeichenfilter.</div></div>
 <script>
 let cards=JSON.parse(localStorage.getItem('opcv_cards')||'[]');
-const $=id=>document.getElementById(id), video=$('video'), canvas=$('canvas');
-let stream=null;
-function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
-function norm(s){
-  let x=String(s||'').toUpperCase().replace(/\s/g,'').replace(/[—–]/g,'-');
-  let m=x.match(/(?:OP|EB|ST|PRB|P)-?\d{2}-?\d{3}/);
-  if(!m)return '';
-  let z=m[0].replace(/-/g,'');
-  return z.slice(0,-3)+'-'+z.slice(-3);
-}
-function status(s){$('status').textContent=s}
-function progress(show,n=0){$('prog').style.display=show?'block':'none';$('bar').style.width=n+'%'}
-async function startCam(){
- try{
-   stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
-   video.srcObject=stream;video.style.display='block';$('camBtns').style.display='flex';
-   status('Kamera läuft. Karte ruhig halten und „Jetzt scannen“ drücken.');
- }catch(e){status('Kamera konnte nicht geöffnet werden. Bitte Kamera-Berechtigung erlauben oder „Foto wählen“ benutzen.')}
-}
+const $=id=>document.getElementById(id),video=$('video'),canvas=$('canvas'),preview=$('preview');let stream=null;
+function norm(s){let x=String(s||'').toUpperCase().replace(/\s+/g,'').replace(/[—–_]/g,'-').replace(/O(?=P\d)/g,'0');let m=x.match(/(?:OP|EB|ST|PRB|P)-?\d{2}-?\d{3}/);if(!m)return'';let z=m[0].replace(/-/g,'');return z.slice(0,-3)+'-'+z.slice(-3)}
+function status(s){$('status').textContent=s}function progress(show,n=0){$('prog').style.display=show?'block':'none';$('bar').style.width=n+'%'}
+async function startCam(){try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});video.srcObject=stream;video.style.display='block';$('camBtns').style.display='flex';status('Kamera läuft. Karte möglichst groß ins Bild halten, dann „Jetzt scannen“.')}catch(e){status('Kamera konnte nicht geöffnet werden. Bitte Berechtigung erlauben oder „Foto wählen“ benutzen.')}}
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;video.style.display='none';$('camBtns').style.display='none'}
-function cropCardNumberToBlob(){
-  const w=video.videoWidth,h=video.videoHeight;
-  if(!w||!h)return null;
-  // unteres Drittel bevorzugen: dort steht die Kartennummer bei OPTCG-Karten
-  const sy=Math.floor(h*0.58), sh=Math.floor(h*0.42);
-  canvas.width=w;canvas.height=sh;
-  const ctx=canvas.getContext('2d');
-  ctx.drawImage(video,0,sy,w,sh,0,0,w,sh);
-  return new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.96));
-}
-async function scanBlob(blob){
-  progress(true,5);status('Kartennummer wird gelesen …');
-  try{
-    const result=await Tesseract.recognize(blob,'eng',{logger:m=>{if(m.progress)progress(true,Math.round(5+m.progress*90))}});
-    const text=result.data.text||'';
-    const n=norm(text);
-    if(n){
-      $('number').value=n;$('set').value=n.split('-')[0];status('Kartennummer erkannt: '+n+' ✅');
-      await lookupCard();
-    }else{
-      status('Kartennummer nicht sicher erkannt. Bitte Karte näher/gerader fotografieren oder die Nummer manuell eintragen.');
-      $('lookup').textContent='OCR-Text: '+text.replace(/\s+/g,' ').slice(0,140);
-    }
-  }catch(e){status('OCR-Fehler. Bitte erneut versuchen oder „Foto wählen“ verwenden.');}
-  finally{progress(false)}
-}
-async function snap(){const blob=await cropCardNumberToBlob();if(blob)scanBlob(blob)}
-async function lookupCard(){
-  const n=norm($('number').value);
-  if(!n){$('lookup').textContent='Bitte zuerst eine gültige Kartennummer eingeben.';return}
-  $('number').value=n;$('set').value=n.split('-')[0];$('lookup').textContent='Kartendaten werden geladen …';
-  try{
-    const r=await fetch('https://optcgapi.com/api/sets/card/'+encodeURIComponent(n)+'/');
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    const data=await r.json();
-    const c=Array.isArray(data)?data[0]:data;
-    const name=c.card_name||c.name||c.cardName||'';
-    const rarity=c.rarity||'';
-    const setName=c.set_name||c.setName||n.split('-')[0];
-    if(name)$('name').value=name;if(rarity)$('rarity').value=rarity;if(setName)$('set').value=setName;
-    $('lookup').innerHTML='<span class="ok">✅ Gefunden: '+esc(name||n)+'</span>';
-  }catch(e){
-    $('lookup').textContent='Kartennummer erkannt, aber Kartendaten konnten nicht automatisch geladen werden. Du kannst Name und Seltenheit manuell ergänzen und trotzdem speichern.';
-  }
-}
-$('photo').onchange=e=>{if(e.target.files[0])scanBlob(e.target.files[0])};
-$('openCam').onclick=startCam;$('closeCam').onclick=stopCam;$('snap').onclick=snap;$('pickPhoto').onclick=()=>$('photo').click();$('lookupBtn').onclick=lookupCard;
-$('number').addEventListener('change',()=>{const n=norm($('number').value);if(n){$('number').value=n;$('set').value=n.split('-')[0]}});
+function canvasToBlob(c,q=.95){return new Promise(res=>c.toBlob(res,'image/jpeg',q))}
+function buildCrops(src){const W=src.width,H=src.height;let defs=[{x:0,y:.66,w:1,h:.34},{x:.42,y:.62,w:.58,h:.38},{x:0,y:.60,w:.58,h:.40}];return defs.map(d=>{let c=document.createElement('canvas'),sw=Math.floor(W*d.w),sh=Math.floor(H*d.h),sx=Math.floor(W*d.x),sy=Math.floor(H*d.y),scale=Math.max(2,Math.min(4,1800/sw));c.width=Math.floor(sw*scale);c.height=Math.floor(sh*scale);let ctx=c.getContext('2d');ctx.drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);let im=ctx.getImageData(0,0,c.width,c.height),p=im.data;for(let i=0;i<p.length;i+=4){let g=.299*p[i]+.587*p[i+1]+.114*p[i+2];g=g<150?Math.max(0,g*.65):Math.min(255,128+(g-128)*1.8);p[i]=p[i+1]=p[i+2]=g}ctx.putImageData(im,0,0);return c})}
+async function ocrCanvas(c,idx,total){status('Kartennummer wird gesucht … Versuch '+idx+'/'+total);let blob=await canvasToBlob(c);let r=await Tesseract.recognize(blob,'eng',{logger:m=>{if(m.progress)progress(true,Math.round(((idx-1)+m.progress)/total*100))}});return r.data.text||''}
+async function lookupCard(n){$('lookup').textContent='🔎 Kartendaten werden gesucht …';try{let r=await fetch('https://optcgapi.com/api/sets/card/'+encodeURIComponent(n)+'/');if(!r.ok)throw 0;let d=await r.json(),c=Array.isArray(d)?d[0]:d;$('name').value=c.card_name||c.name||'';$('rarity').value=c.rarity||'';$('set').value=n.split('-')[0];$('lookup').innerHTML='<span class="ok">✅ Karte gefunden'+(($('name').value)?': '+$('name').value:'')+'</span>'}catch(e){$('set').value=n.split('-')[0];$('lookup').textContent='Nummer erkannt. Kartendaten konnten nicht automatisch geladen werden – Name kann manuell ergänzt werden.'}}
+async function scanSource(src){progress(true,1);preview.style.display='none';status('Bild wird vorbereitet …');try{let crops=buildCrops(src);let found='',all='';for(let i=0;i<crops.length;i++){preview.src=crops[i].toDataURL('image/jpeg',.9);preview.style.display='block';let txt=await ocrCanvas(crops[i],i+1,crops.length);all+=' '+txt;found=norm(txt)||norm(all);if(found)break}if(found){$('number').value=found;$('set').value=found.split('-')[0];status('✅ Kartennummer erkannt: '+found);await lookupCard(found)}else{status('Kartennummer noch nicht sicher erkannt. Versuche die Karte größer im Bild oder fotografiere besonders den unteren Kartenrand.')}}catch(e){console.error(e);status('Scanner-Fehler. Bitte nochmals versuchen oder Foto wählen.')}finally{progress(false)}}
+async function snap(){status('Foto wird aufgenommen …');if(!video.videoWidth){status('Kamerabild ist noch nicht bereit. Bitte 1–2 Sekunden warten und nochmals drücken.');return}canvas.width=video.videoWidth;canvas.height=video.videoHeight;canvas.getContext('2d').drawImage(video,0,0);await scanSource(canvas)}
+$('photo').onchange=e=>{let f=e.target.files[0];if(!f)return;let img=new Image();img.onload=()=>scanSource(img);img.src=URL.createObjectURL(f)};$('openCam').onclick=startCam;$('closeCam').onclick=stopCam;$('snap').onclick=snap;$('pickPhoto').onclick=()=>$('photo').click();
 function save(){localStorage.setItem('opcv_cards',JSON.stringify(cards));render()}
-$('saveCard').onclick=()=>{
- const c={number:norm($('number').value)||$('number').value.trim().toUpperCase(),name:$('name').value.trim(),set:$('set').value.trim(),rarity:$('rarity').value.trim(),qty:Math.max(1,+$('addqty').value||1),note:$('note').value.trim()};
- if(!c.number&&!c.name){alert('Bitte Kartennummer oder Name eingeben.');return}
- let old=c.number?cards.find(x=>(x.number||'').toUpperCase()===c.number.toUpperCase()):null;
- if(old){old.qty=(+old.qty||0)+c.qty;if(c.name)old.name=c.name;if(c.set)old.set=c.set;if(c.rarity)old.rarity=c.rarity;if(c.note)old.note=c.note}
- else cards.push(c);
- ['number','name','set','rarity','note'].forEach(x=>$(x).value='');$('addqty').value=1;$('lookup').innerHTML='<span class="ok">Gespeichert ✅</span>';save();
-}
-function change(i,d){cards[i].qty=(+cards[i].qty||0)+d;if(cards[i].qty<1)cards.splice(i,1);save()}
-function render(){
- const q=$('search').value.toLowerCase();
- const arr=cards.map((c,i)=>({...c,i})).filter(c=>[c.number,c.name,c.set,c.rarity,c.note].join(' ').toLowerCase().includes(q));
- const total=cards.reduce((s,c)=>s+(+c.qty||0),0);$('total').textContent=total;$('unique').textContent=cards.length;$('dupes').textContent=Math.max(0,total-cards.length);
- $('list').innerHTML=arr.length?arr.map(c=>'<div class="card"><div class="info"><div class="name">'+esc(c.name||'Unbekannt')+'</div><div class="meta">'+esc(c.number||'')+(c.set?' · '+esc(c.set):'')+(c.rarity?' · '+esc(c.rarity):'')+'</div></div><div class="qty"><button class="secondary" onclick="change('+c.i+',-1)">−</button><b>'+c.qty+'</b><button class="secondary" onclick="change('+c.i+',1)">+</button></div></div>').join(''):'<div class="empty">Noch keine Karten.</div>';
-}
-$('search').oninput=render;
-function dl(n,t,type){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type}));a.download=n;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),700)}
-$('backup').onclick=()=>dl('card-vault-backup.json',JSON.stringify(cards,null,2),'application/json');
-$('csv').onclick=()=>{let r=[['Kartennummer','Name','Set','Seltenheit','Anzahl','Notiz'],...cards.map(c=>[c.number,c.name,c.set,c.rarity,c.qty,c.note])];dl('card-vault.csv','\ufeff'+r.map(x=>x.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(';')).join('\n'),'text/csv;charset=utf-8')};
-render();
-</script>
-</body>
-</html>
+$('saveCard').onclick=()=>{let c={number:$('number').value.trim().toUpperCase(),name:$('name').value.trim(),set:$('set').value.trim().toUpperCase(),rarity:$('rarity').value.trim(),qty:Math.max(1,+$('addqty').value||1),note:$('note').value.trim()};if(!c.number&&!c.name){alert('Bitte Kartennummer oder Name eingeben.');return}let old=c.number?cards.find(x=>(x.number||'').toUpperCase()===c.number):null;if(old){old.qty+=c.qty;if(c.name)old.name=c.name;if(c.set)old.set=c.set;if(c.rarity)old.rarity=c.rarity}else cards.push(c);['number','name','set','rarity','note'].forEach(x=>$(x).value='');$('addqty').value=1;$('lookup').textContent='Gespeichert ✅';save()}
+function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}function change(i,d){cards[i].qty+=d;if(cards[i].qty<1)cards.splice(i,1);save()}
+function render(){let q=$('search').value.toLowerCase();let arr=cards.map((c,i)=>({...c,i})).filter(c=>[c.number,c.name,c.set].join(' ').toLowerCase().includes(q));$('total').textContent=cards.reduce((s,c)=>s+c.qty,0);$('unique').textContent=cards.length;$('dupes').textContent=Math.max(0,cards.reduce((s,c)=>s+c.qty,0)-cards.length);$('list').innerHTML=arr.length?arr.map(c=>`<div class="card"><div class="info"><div class="name">${esc(c.name||'Unbekannt')}</div><div class="meta">${esc(c.number)} ${c.set?'· '+esc(c.set):''}</div></div><div class="qty"><button class="secondary" onclick="change(${c.i},-1)">−</button><b>${c.qty}</b><button class="secondary" onclick="change(${c.i},1)">+</button></div></div>`).join(''):'<div class="empty">Noch keine Karten.</div>'}$('search').oninput=render;
+function dl(n,t,type){let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([t],{type}));a.download=n;a.click()}$('backup').onclick=()=>dl('card-vault-backup.json',JSON.stringify(cards,null,2),'application/json');$('csv').onclick=()=>{let r=[['Kartennummer','Name','Set','Seltenheit','Anzahl','Notiz'],...cards.map(c=>[c.number,c.name,c.set,c.rarity,c.qty,c.note])];dl('card-vault.csv','\ufeff'+r.map(x=>x.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(';')).join('\n'),'text/csv;charset=utf-8')};render();
+</script></body></html>

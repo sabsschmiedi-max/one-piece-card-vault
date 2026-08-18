@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.3.3.1</title>
+<title>One Piece Card Vault 0.3.4</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -20,7 +20,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.3.3.1 · Kamera-Fix + Multi-Pass-OCR</div>
+<div class="sub">Version 0.3.4 · automatische Drehung + flexibler Scanbereich</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -40,7 +40,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
 <button class="secondary" id="closeCam">Schließen</button>
 </div>
 <div class="progress" id="prog"><div class="bar" id="bar"></div></div>
-<div id="status" class="hint">Lege die Karte so ins Bild, dass die komplette Unterkante innerhalb des gestrichelten Rahmens liegt.</div>
+<div id="status" class="hint">Halte die Karte möglichst groß ins Bild. Sie darf hochkant, quer oder gedreht sein – 0.3.4 prüft alle 4 Ausrichtungen.</div>
 <div id="diag" class="hint" style="margin-top:5px;color:#73dda7">Diagnose: App bereit.</div>
 </section>
 
@@ -104,7 +104,7 @@ async function startCam(){
     video.srcObject=stream;
     $('camBtns').style.display='flex';
     $('guide').style.display='block';
-    setStatus('Kamera läuft. Richte die komplette Kartenunterkante in den gestrichelten Rahmen.');
+    setStatus('Kamera läuft. Karte möglichst groß halten – die Ausrichtung darf jetzt variieren.');
     diag('Kamera geöffnet ✅');
   }catch(e){
     console.error(e);
@@ -148,42 +148,75 @@ async function ocrCanvas(c,label,baseProgress){
   return (res && res.data && res.data.text) ? res.data.text : '';
 }
 
+
+function rotateCanvas(src,deg){
+  const rad=deg*Math.PI/180;
+  const swap=deg%180!==0;
+  const c=document.createElement('canvas');
+  c.width=swap?src.height:src.width;
+  c.height=swap?src.width:src.height;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.translate(c.width/2,c.height/2);
+  ctx.rotate(rad);
+  ctx.drawImage(src,-src.width/2,-src.height/2);
+  return c;
+}
+
 async function scanSource(sourceCanvas){
-  resetDetected(); prog(true,4); diag('Bild aufgenommen. Starte Mehrfach-OCR …');
+  resetDetected();
+  prog(true,4);
   try{
-    const W=sourceCanvas.width,H=sourceCanvas.height;
-    const regions=[
-      ['unten rechts sehr eng',.70,.82,.29,.17,9],
-      ['unten rechts eng',.62,.78,.37,.21,8],
-      ['unten rechts breit',.50,.74,.49,.25,7],
-      ['gesamter Unterrand',.02,.75,.97,.24,5]
+    const rotations=[0,90,180,270];
+    const modes=['color','contrast','hard'];
+    let seen='', pass=0;
+
+    // Für jede Drehung prüfen wir breite Unterkanten-Bereiche.
+    // Dadurch darf die Karte hochkant/quer/gedreht oder seitlich versetzt sein.
+    const regionDefs=[
+      ['Unterkante komplett', .00,.68,1.00,.32,5],
+      ['Unterkante tief',     .00,.80,1.00,.20,7],
+      ['rechts unten',        .45,.68,.55,.32,7],
+      ['links unten',         .00,.68,.55,.32,7]
     ];
-    const modes=['color','contrast','hard','invert'];
-    let seen='',pass=0,total=regions.length*modes.length;
-    for(const r of regions){
-      for(const mode of modes){
-        pass++;
-        const [label,rx,ry,rw,rh,scale]=r;
-        const c=makeCrop(sourceCanvas,W*rx,H*ry,W*rw,H*rh,scale,mode);
-        const text=await ocrCanvas(c,label+' · '+mode,5+Math.round(pass/total*80));
-        seen+=' '+text;
-        const n=normalize(text)||normalize(seen);
-        if(n){
-          $('number').value=n; $('set').value=n.split('-')[0];
-          $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
-          setStatus('Kartennummer erkannt: '+n+' 🎉'); diag('Treffer nach '+pass+' OCR-Durchläufen ✅');
-          prog(false); return;
+    const total=rotations.length*regionDefs.length*modes.length;
+
+    for(const deg of rotations){
+      const oriented=deg===0?sourceCanvas:rotateCanvas(sourceCanvas,deg);
+      const W=oriented.width,H=oriented.height;
+
+      for(const r of regionDefs){
+        for(const mode of modes){
+          pass++;
+          const [label,rx,ry,rw,rh,scale]=r;
+          const c=makeCrop(oriented,W*rx,H*ry,W*rw,H*rh,scale,mode);
+          const text=await ocrCanvas(c,deg+'° · '+label+' · '+mode,
+                                    5+Math.round(pass/total*82));
+          seen+=' '+text;
+          const n=normalize(text)||normalize(seen);
+
+          if(n){
+            $('number').value=n;
+            $('set').value=n.split('-')[0];
+            $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
+            setStatus('Kartennummer erkannt: '+n+' 🎉');
+            if($('diag')) $('diag').textContent='Diagnose: Treffer bei '+deg+'° nach '+pass+' OCR-Durchläufen ✅';
+            prog(false);
+            return;
+          }
         }
       }
     }
-    setStatus('Die Nummer ist im Scanbereich, wurde aber noch nicht sicher gelesen.');
-    diag('Kein Treffer nach '+pass+' OCR-Durchläufen.');
-  }catch(e){
-    console.error(e); setStatus('OCR-Fehler. Bitte noch einmal versuchen.');
-    diag('OCR-Fehler: '+(e && e.message ? e.message : 'unbekannt'));
-  }finally{prog(false)}
-}
 
+    setStatus('Kartennummer noch nicht sicher erkannt. Die App hat alle 4 Ausrichtungen geprüft. Halte die Karte etwas größer ins Bild.');
+    if($('diag')) $('diag').textContent='Diagnose: 0°, 90°, 180° und 270° geprüft – kein sicherer Treffer.';
+  }catch(e){
+    console.error(e);
+    setStatus('OCR-Fehler. Bitte noch einmal versuchen.');
+    if($('diag')) $('diag').textContent='Diagnose: OCR-Fehler – '+(e?.message||e);
+  }finally{
+    prog(false);
+  }
+}
 function scanLive(){
   diag('Scan-Button erkannt …');
   if(!video.videoWidth){setStatus('Noch kein Kamerabild verfügbar.');diag('Kein Videobild.');return;}

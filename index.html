@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.3.4</title>
+<title>One Piece Card Vault 0.3.5</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -20,7 +20,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.3.4 · automatische Drehung + flexibler Scanbereich</div>
+<div class="sub">Version 0.3.5 · sichere Trefferprüfung + Mehrfachbestätigung</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -74,80 +74,65 @@ function setStatus(s){$('status').textContent=s}
 function diag(s){$('diag').textContent='Diagnose: '+s}
 function prog(show,n=0){$('prog').style.display=show?'block':'none';$('bar').style.width=n+'%'}
 function normalize(text){
-  const raw=String(text||'').toUpperCase().replace(/[—–_\s]/g,'').replace(/\|/g,'1');
-  const fix=x=>String(x).replace(/O/g,'0').replace(/[IL]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
-  const prefixes=['PRB','OP','EB','ST','P'];
+  const raw=String(text||'').toUpperCase()
+    .replace(/[—–_]/g,'-')
+    .replace(/\s+/g,'')
+    .replace(/[|]/g,'1');
+
+  const fixDigits=x=>x
+    .replace(/O/g,'0')
+    .replace(/[IL]/g,'1')
+    .replace(/S/g,'5')
+    .replace(/B/g,'8');
+
+  // Gültige One-Piece-Präfixe.
+  const prefixes=['OP','EB','ST','PRB'];
+
+  // Standardformate wie OP15-030, EB02-057, ST21-001, PRB01-015
   for(const pre of prefixes){
     const pos=raw.indexOf(pre);
     if(pos>=0){
-      const tail=fix(raw.slice(pos+pre.length,pos+pre.length+14).replace(/-/g,''));
+      let tail=raw.slice(pos+pre.length,pos+pre.length+12).replace(/-/g,'');
+      tail=fixDigits(tail);
       const m=tail.match(/\d{5}/);
-      if(m) return pre+m[0].slice(0,2)+'-'+m[0].slice(2,5);
+      if(m){
+        const n=pre+m[0].slice(0,2)+'-'+m[0].slice(2,5);
+        return isPlausible(n)?n:'';
+      }
     }
   }
+
+  // Promo-Format P-001
+  let promo=raw.match(/P-?([0-9OILSB]{3})/);
+  if(promo){
+    const n='P-'+fixDigits(promo[1]);
+    return isPlausible(n)?n:'';
+  }
+
+  // Lockerer OP-Fallback, falls O/P leicht beschädigt sind.
   const loose=raw.match(/[O0]P?-?([0-9OILSB]{2})-?([0-9OILSB]{3})/);
-  return loose ? 'OP'+fix(loose[1])+'-'+fix(loose[2]) : '';
-}
-
-async function startCam(){
-  diag('Kamera-Button erkannt …');
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{
-        facingMode:{ideal:'environment'},
-        width:{ideal:3840},
-        height:{ideal:2160},
-        advanced:[{focusMode:'continuous'}]
-      },
-      audio:false
-    });
-    video.srcObject=stream;
-    $('camBtns').style.display='flex';
-    $('guide').style.display='block';
-    setStatus('Kamera läuft. Karte möglichst groß halten – die Ausrichtung darf jetzt variieren.');
-    diag('Kamera geöffnet ✅');
-  }catch(e){
-    console.error(e);
-    setStatus('Kamera konnte nicht geöffnet werden. Bitte Berechtigung erlauben oder „Foto wählen“ benutzen.');
-    diag('Kamera-Fehler: '+(e && e.name ? e.name : 'unbekannt'));
+  if(loose){
+    const n='OP'+fixDigits(loose[1])+'-'+fixDigits(loose[2]);
+    return isPlausible(n)?n:'';
   }
-}
-function stopCam(){
-  if(stream)stream.getTracks().forEach(t=>t.stop());
-  stream=null;$('camBtns').style.display='none';$('guide').style.display='none';
-}
-function resetDetected(){
-  $('number').value=''; $('set').value=''; $('lookup').textContent='';
+
+  return '';
 }
 
-function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
-  const c=document.createElement('canvas');
-  c.width=Math.max(1,Math.round(w*scale)); c.height=Math.max(1,Math.round(h*scale));
-  const ctx=c.getContext('2d',{willReadFrequently:true});
-  ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
-  ctx.drawImage(sourceCanvas,x,y,w,h,0,0,c.width,c.height);
-  if(mode==='color') return c;
-  const im=ctx.getImageData(0,0,c.width,c.height), d=im.data;
-  for(let i=0;i<d.length;i+=4){
-    const g=.299*d[i]+.587*d[i+1]+.114*d[i+2]; let v=g;
-    if(mode==='contrast') v=g>155?255:(g<70?0:Math.round((g-70)*255/85));
-    if(mode==='hard') v=g>135?255:0;
-    if(mode==='invert') v=255-(g>155?255:(g<70?0:Math.round((g-70)*255/85)));
-    d[i]=d[i+1]=d[i+2]=v;
-  }
-  ctx.putImageData(im,0,0); return c;
-}
+function isPlausible(n){
+  // Nur echte One-Piece-ähnliche Nummern zulassen.
+  if(/^P-\d{3}$/.test(n)) return true;
+  const m=n.match(/^(OP|EB|ST|PRB)(\d{2})-(\d{3})$/);
+  if(!m) return false;
 
-async function ocrCanvas(c,label,baseProgress){
-  preview.width=c.width; preview.height=c.height;
-  preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.3.3.1: '+label+' …'); diag('OCR läuft: '+label);
-  const res=await Tesseract.recognize(c,'eng',{
-    logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
-  });
-  return (res && res.data && res.data.text) ? res.data.text : '';
-}
+  const setNum=Number(m[2]);
+  const cardNum=Number(m[3]);
 
+  // großzügige, aber sinnvolle Grenzen gegen OCR-Unsinn wie P44-151
+  if(setNum<1 || setNum>99) return false;
+  if(cardNum<1 || cardNum>300) return false;
+  return true;
+}
 
 function rotateCanvas(src,deg){
   const rad=deg*Math.PI/180;
@@ -165,20 +150,28 @@ function rotateCanvas(src,deg){
 async function scanSource(sourceCanvas){
   resetDetected();
   prog(true,4);
+
   try{
     const rotations=[0,90,180,270];
     const modes=['color','contrast','hard'];
-    let seen='', pass=0;
-
-    // Für jede Drehung prüfen wir breite Unterkanten-Bereiche.
-    // Dadurch darf die Karte hochkant/quer/gedreht oder seitlich versetzt sein.
     const regionDefs=[
       ['Unterkante komplett', .00,.68,1.00,.32,5],
       ['Unterkante tief',     .00,.80,1.00,.20,7],
       ['rechts unten',        .45,.68,.55,.32,7],
       ['links unten',         .00,.68,.55,.32,7]
     ];
+
     const total=rotations.length*regionDefs.length*modes.length;
+    const votes=new Map();
+    let pass=0;
+
+    const addVote=(candidate,deg,label,mode)=>{
+      if(!candidate) return;
+      const x=votes.get(candidate)||{count:0,hits:[]};
+      x.count++;
+      x.hits.push({deg,label,mode});
+      votes.set(candidate,x);
+    };
 
     for(const deg of rotations){
       const oriented=deg===0?sourceCanvas:rotateCanvas(sourceCanvas,deg);
@@ -189,26 +182,46 @@ async function scanSource(sourceCanvas){
           pass++;
           const [label,rx,ry,rw,rh,scale]=r;
           const c=makeCrop(oriented,W*rx,H*ry,W*rw,H*rh,scale,mode);
-          const text=await ocrCanvas(c,deg+'° · '+label+' · '+mode,
-                                    5+Math.round(pass/total*82));
-          seen+=' '+text;
-          const n=normalize(text)||normalize(seen);
+          const text=await ocrCanvas(
+            c,
+            deg+'° · '+label+' · '+mode,
+            5+Math.round(pass/total*82)
+          );
 
+          const n=normalize(text);
           if(n){
-            $('number').value=n;
-            $('set').value=n.split('-')[0];
-            $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
-            setStatus('Kartennummer erkannt: '+n+' 🎉');
-            if($('diag')) $('diag').textContent='Diagnose: Treffer bei '+deg+'° nach '+pass+' OCR-Durchläufen ✅';
-            prog(false);
-            return;
+            addVote(n,deg,label,mode);
+            const v=votes.get(n);
+
+            // Erst nach mindestens 2 unabhängigen Treffern akzeptieren.
+            if(v.count>=2){
+              $('number').value=n;
+              $('set').value=n.startsWith('P-')?'P':n.split('-')[0];
+              $('lookup').innerHTML='<span class="ok">✅ Bestätigt erkannt: '+n+'</span>';
+              setStatus('Kartennummer bestätigt erkannt: '+n+' 🎉');
+              if($('diag')){
+                const uniqueAngles=[...new Set(v.hits.map(h=>h.deg))].join('°, ');
+                $('diag').textContent='Diagnose: '+v.count+' Treffer bestätigt · Winkel '+uniqueAngles+'° ✅';
+              }
+              prog(false);
+              return;
+            }
           }
         }
       }
     }
 
-    setStatus('Kartennummer noch nicht sicher erkannt. Die App hat alle 4 Ausrichtungen geprüft. Halte die Karte etwas größer ins Bild.');
-    if($('diag')) $('diag').textContent='Diagnose: 0°, 90°, 180° und 270° geprüft – kein sicherer Treffer.';
+    // Falls genau ein plausibler Treffer vorhanden ist, zeigen wir ihn NICHT als sicher an.
+    const ranked=[...votes.entries()].sort((a,b)=>b[1].count-a[1].count);
+    if(ranked.length){
+      const [candidate,data]=ranked[0];
+      setStatus('Möglicher Treffer '+candidate+', aber noch nicht sicher bestätigt. Bitte erneut scannen.');
+      if($('diag')) $('diag').textContent='Diagnose: '+candidate+' nur '+data.count+'× erkannt – deshalb nicht gespeichert.';
+    }else{
+      setStatus('Keine plausible One-Piece-Kartennummer erkannt. Bitte Karte etwas größer oder gerader halten.');
+      if($('diag')) $('diag').textContent='Diagnose: Alle 4 Ausrichtungen geprüft – kein gültiger Treffer.';
+    }
+
   }catch(e){
     console.error(e);
     setStatus('OCR-Fehler. Bitte noch einmal versuchen.');

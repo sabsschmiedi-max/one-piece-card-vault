@@ -39,7 +39,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.5 · höherer Zielrahmen + OP-Code-OCR</div>
+<div class="sub">Version 0.4.6 · breiter Unterkanten-Scan + OP-Code-OCR</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -298,110 +298,67 @@ async function scanSource(sourceCanvas){
   const started=performance.now();
 
   try{
-    const W=sourceCanvas.width;
-    const H=sourceCanvas.height;
+    const W=sourceCanvas.width, H=sourceCanvas.height;
+    setStatus('Kartennummer an der Kartenunterkante wird gesucht …');
+    if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Unterkanten-Suche läuft …';
 
-    // 0.4.5: High-Res-Guide-Mapping; Zielrahmen im Livebild deutlich höher
-    const guideRect=$('guide').getBoundingClientRect();
-    const videoRect=video.getBoundingClientRect();
+    // 0.4.6: Nicht mehr vom kleinen Guide abhängig.
+    // Wir durchsuchen mehrere breite Streifen im unteren Bildbereich.
+    const bands=[
+      [0.05,0.58,0.90,0.18],
+      [0.05,0.68,0.90,0.18],
+      [0.05,0.76,0.90,0.18]
+    ];
+    const commonOpts={tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',preserve_interword_spaces:'0'};
+    let found='', rawAll='', bestCrop=null;
 
-    let nx=(guideRect.left-videoRect.left)/videoRect.width;
-    let ny=(guideRect.top-videoRect.top)/videoRect.height;
-    let nw=guideRect.width/videoRect.width;
-    let nh=guideRect.height/videoRect.height;
+    for(let i=0;i<bands.length && !found;i++){
+      const [rx,ry,rw,rh]=bands[i];
+      const x=Math.round(W*rx), y=Math.round(H*ry), w=Math.round(W*rw), h=Math.round(H*rh);
+      const crop=document.createElement('canvas');
+      const scale=2;
+      crop.width=Math.round(w*scale); crop.height=Math.round(h*scale);
+      const ctx=crop.getContext('2d',{willReadFrequently:true});
+      ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(sourceCanvas,x,y,w,h,0,0,crop.width,crop.height);
+      bestCrop=crop;
 
-    nx=Math.max(0,nx-0.035);
-    ny=Math.max(0,ny-0.025);
-    nw=Math.min(1-nx,nw+0.07);
-    nh=Math.min(1-ny,nh+0.05);
+      preview.width=crop.width; preview.height=crop.height;
+      preview.getContext('2d').drawImage(crop,0,0); preview.style.display='block';
 
-    const liveAspect=(video.videoWidth&&video.videoHeight)
-      ? video.videoWidth/video.videoHeight
-      : videoRect.width/videoRect.height;
-    const photoAspect=W/H;
-
-    let baseX=0,baseY=0,baseW=W,baseH=H;
-    if(photoAspect>liveAspect){
-      baseW=H*liveAspect;
-      baseX=(W-baseW)/2;
-    }else if(photoAspect<liveAspect){
-      baseH=W/liveAspect;
-      baseY=(H-baseH)/2;
+      const res=await Tesseract.recognize(crop,'eng',{
+        logger:m=>{if(m.progress) prog(true,Math.min(94,12+i*28+Math.round(m.progress*24)))}
+      },{...commonOpts,tessedit_pageseg_mode:'11'});
+      const raw=(res.data.text||'').trim();
+      rawAll+=' '+raw;
+      found=normalize(rawAll);
     }
 
-    const x=Math.max(0,baseX+nx*baseW);
-    const y=Math.max(0,baseY+ny*baseH);
-    const w=Math.min(W-x,nw*baseW);
-    const h=Math.min(H-y,nh*baseH);
-
-    const scale=4;
-    const crop=document.createElement('canvas');
-    crop.width=Math.max(1,Math.round(w*scale));
-    crop.height=Math.max(1,Math.round(h*scale));
-    const ctx=crop.getContext('2d');
-
-    // Originalfarbe, kein Weichzeichnen
-    ctx.imageSmoothingEnabled=false;
-    ctx.drawImage(sourceCanvas,x,y,w,h,0,0,crop.width,crop.height);
-
-    preview.width=crop.width;
-    preview.height=crop.height;
-    preview.getContext('2d').drawImage(crop,0,0);
-    preview.style.display='block';
-
-    if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR läuft …';
-    setStatus('OP-Kartennummer wird gelesen …');
-
-    const commonOpts={
-      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-      preserve_interword_spaces:'0'
-    };
-
-    // Pass 1: einzelne Textzeile
-    let res=await Tesseract.recognize(
-      crop,'eng',
-      {logger:m=>{if(m.progress) prog(true,Math.min(72,15+Math.round(m.progress*50))) }},
-      {...commonOpts,tessedit_pageseg_mode:'7'}
-    );
-
-    let raw=(res.data.text||'').trim();
-    let n=normalize(raw);
-
-    // Pass 2 nur wenn nötig: sparse text - immer noch derselbe kleine Crop
-    if(!n){
-      res=await Tesseract.recognize(
-        crop,'eng',
-        {logger:m=>{if(m.progress) prog(true,Math.min(96,70+Math.round(m.progress*25))) }},
-        {...commonOpts,tessedit_pageseg_mode:'11'}
-      );
-      raw+=' '+(res.data.text||'').trim();
-      n=normalize(raw);
+    // Letzter schneller Versuch: kompletter unterer Bereich, falls die Karte tiefer/höher liegt.
+    if(!found){
+      const x=Math.round(W*.02), y=Math.round(H*.52), w=Math.round(W*.96), h=Math.round(H*.46);
+      const crop=document.createElement('canvas'); crop.width=w; crop.height=h;
+      crop.getContext('2d').drawImage(sourceCanvas,x,y,w,h,0,0,w,h); bestCrop=crop;
+      preview.width=w; preview.height=h; preview.getContext('2d').drawImage(crop,0,0); preview.style.display='block';
+      const res=await Tesseract.recognize(crop,'eng',{logger:m=>{if(m.progress) prog(true,Math.min(98,82+Math.round(m.progress*15)))}},{...commonOpts,tessedit_pageseg_mode:'11'});
+      rawAll+=' '+(res.data.text||'').trim(); found=normalize(rawAll);
     }
 
     const elapsed=((performance.now()-started)/1000).toFixed(1);
-
-    if(n){
-      $('number').value=n;
-      $('set').value=n.split('-')[0];
-      $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
-      setStatus('Kartennummer erkannt: '+n+' 🎉');
-      if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR · '+elapsed+' s · Treffer ✅';
-      }
+    if(found){
+      $('number').value=found; $('set').value=found.split('-')[0];
+      $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+found+'</span>';
+      setStatus('Kartennummer erkannt: '+found+' 🎉');
+      if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Unterkanten-Scan · '+elapsed+' s · Treffer ✅';
     }else{
-      setStatus('Kein sicherer OP/EB/ST/PRB-Treffer im High-Res-Ausschnitt.');
-      if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR · '+elapsed+' s · kein sicherer Treffer';
-      }
+      setStatus('Kein sicherer OP/EB/ST/PRB-Treffer an der Kartenunterkante.');
+      if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Unterkanten-Scan · '+elapsed+' s · kein sicherer Treffer';
     }
   }catch(e){
     const elapsed=((performance.now()-started)/1000).toFixed(1);
-    console.error(e);
-    setStatus('OCR-/Aufnahmefehler.');
+    console.error(e); setStatus('OCR-/Aufnahmefehler.');
     if($('diag')) $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
-  }finally{
-    prog(false);
-  }
+  }finally{ prog(false); }
 }
 
 async function scanLive(){

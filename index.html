@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.1</title>
+<title>One Piece Card Vault 0.4.2</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:2.5%;bottom:3%;width:38%;height:11%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:2.5%;bottom:3%;width:40%;height:10%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -39,7 +39,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.1 · strengere Nummernprüfung</div>
+<div class="sub">Version 0.4.2 · High-Resolution Number Capture</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -260,29 +260,60 @@ function makeReadableCrop(sourceCanvas,x,y,w,h,scale=10){
   return c;
 }
 
+
+async function captureHighResFrame(){
+  if(!stream) throw new Error('Kamera ist nicht geöffnet.');
+  const track=stream.getVideoTracks()[0];
+  if(!track) throw new Error('Kein Video-Track verfügbar.');
+
+  // Bevorzugt echtes hochauflösendes Standbild über ImageCapture.
+  if('ImageCapture' in window){
+    try{
+      const cap=new ImageCapture(track);
+      const blob=await cap.takePhoto();
+      const bmp=await createImageBitmap(blob);
+      const c=document.createElement('canvas');
+      c.width=bmp.width;
+      c.height=bmp.height;
+      c.getContext('2d').drawImage(bmp,0,0);
+      bmp.close?.();
+      return c;
+    }catch(e){
+      console.warn('ImageCapture fallback:',e);
+    }
+  }
+
+  // Fallback: voller Video-Frame in nativer Stream-Auflösung.
+  const c=document.createElement('canvas');
+  c.width=video.videoWidth;
+  c.height=video.videoHeight;
+  c.getContext('2d').drawImage(video,0,0,c.width,c.height);
+  return c;
+}
+
 async function scanSource(sourceCanvas){
   resetDetected();
-  prog(true,12);
+  prog(true,10);
   const started=performance.now();
 
   try{
     const W=sourceCanvas.width;
     const H=sourceCanvas.height;
 
-    // 0.4.1: etwas breiter nach links, damit "OP" sicher mit im Ausschnitt liegt.
-    const x=W*0.62;
-    const y=H*0.865;
-    const w=W*0.36;
-    const h=H*0.10;
-    const scale=11;
+    // 0.4.2: breiter, flacher Original-Farbausschnitt aus HOCHAUFLÖSENDEM Standbild.
+    const x=W*0.60;
+    const y=H*0.86;
+    const w=W*0.38;
+    const h=H*0.105;
+    const scale=4;
 
     const crop=document.createElement('canvas');
     crop.width=Math.max(1,Math.round(w*scale));
     crop.height=Math.max(1,Math.round(h*scale));
     const ctx=crop.getContext('2d');
 
-    ctx.imageSmoothingEnabled=true;
-    ctx.imageSmoothingQuality='high';
+    // Nearest-neighbour verhindert zusätzliches Weichzeichnen kleiner Schrift.
+    ctx.imageSmoothingEnabled=false;
     ctx.drawImage(sourceCanvas,x,y,w,h,0,0,crop.width,crop.height);
 
     preview.width=crop.width;
@@ -290,8 +321,10 @@ async function scanSource(sourceCanvas){
     preview.getContext('2d').drawImage(crop,0,0);
     preview.style.display='block';
 
-    if($('diag')) $('diag').textContent='Diagnose: gezielter OP/EB/ST/PRB-Scan läuft …';
-    setStatus('Gezielte Kartennummer-Erkennung läuft …');
+    if($('diag')){
+      $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OCR läuft …';
+    }
+    setStatus('High-Resolution-Kartennummer wird gelesen …');
 
     const res=await Tesseract.recognize(
       crop,
@@ -320,18 +353,18 @@ async function scanSource(sourceCanvas){
       $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
       setStatus('Kartennummer erkannt: '+n+' 🎉');
       if($('diag')){
-        $('diag').textContent='Diagnose: 1 gezielter OCR-Versuch · '+elapsed+' s · Treffer ✅';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · '+elapsed+' s · Treffer ✅';
       }
     }else{
-      setStatus('Kein sicherer OP/EB/ST/PRB-Treffer. Ein Promo-ähnlicher Fehlwert wird nicht mehr übernommen.');
+      setStatus('Kein sicherer OP/EB/ST/PRB-Treffer im High-Res-Ausschnitt.');
       if($('diag')){
-        $('diag').textContent='Diagnose: 1 gezielter OCR-Versuch · '+elapsed+' s · kein sicherer Treffer';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · '+elapsed+' s · kein sicherer Treffer';
       }
     }
   }catch(e){
     const elapsed=((performance.now()-started)/1000).toFixed(1);
     console.error(e);
-    setStatus('OCR-Fehler.');
+    setStatus('OCR-/Aufnahmefehler.');
     if($('diag')){
       $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
     }
@@ -340,13 +373,22 @@ async function scanSource(sourceCanvas){
   }
 }
 
-function scanLive(){
-  diag('Scan-Button erkannt …');
-  if(!video.videoWidth){setStatus('Noch kein Kamerabild verfügbar.');diag('Kein Videobild.');return;}
-  canvas.width=video.videoWidth;canvas.height=video.videoHeight;
-  canvas.getContext('2d').drawImage(video,0,0);
-  setStatus('Bild aufgenommen – Auswertung startet …');
-  scanSource(canvas);
+async function scanLive(){
+  if(!stream){
+    setStatus('Bitte zuerst die Kamera öffnen.');
+    return;
+  }
+  if($('diag')) $('diag').textContent='Diagnose: Hochauflösendes Standbild wird aufgenommen …';
+  setStatus('High-Res-Aufnahme …');
+
+  try{
+    const hi=await captureHighResFrame();
+    await scanSource(hi);
+  }catch(e){
+    console.error(e);
+    setStatus('High-Res-Aufnahme fehlgeschlagen.');
+    if($('diag')) $('diag').textContent='Diagnose: '+(e?.message||e);
+  }
 }
 
 $('photo').onchange=e=>{

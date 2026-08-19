@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.2</title>
+<title>One Piece Card Vault 0.4.3</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -39,7 +39,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.2 · High-Resolution Number Capture</div>
+<div class="sub">Version 0.4.3 · High-Res Guide-Mapping Fix</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -300,11 +300,47 @@ async function scanSource(sourceCanvas){
     const W=sourceCanvas.width;
     const H=sourceCanvas.height;
 
-    // 0.4.2: breiter, flacher Original-Farbausschnitt aus HOCHAUFLÖSENDEM Standbild.
-    const x=W*0.60;
-    const y=H*0.86;
-    const w=W*0.38;
-    const h=H*0.105;
+    // 0.4.3: Den High-Res-Ausschnitt aus der TATSÄCHLICHEN Position
+    // des blauen Rahmens ableiten, statt feste Foto-Koordinaten zu verwenden.
+    // takePhoto() kann ein anderes Seitenverhältnis/FOV als die Live-Vorschau liefern.
+    const wrap=$('guide').parentElement;
+    const guideRect=$('guide').getBoundingClientRect();
+    const videoRect=video.getBoundingClientRect();
+
+    // Position des Guides relativ zur sichtbaren Video-Fläche.
+    let nx=(guideRect.left-videoRect.left)/videoRect.width;
+    let ny=(guideRect.top-videoRect.top)/videoRect.height;
+    let nw=guideRect.width/videoRect.width;
+    let nh=guideRect.height/videoRect.height;
+
+    // Sicherheitsrand: Nummer sitzt oft ganz unten/rechts auf der Karte.
+    nx=Math.max(0,nx-0.025);
+    ny=Math.max(0,ny-0.025);
+    nw=Math.min(1-nx,nw+0.05);
+    nh=Math.min(1-ny,nh+0.05);
+
+    // Live-Vorschau und Foto können verschiedene Seitenverhältnisse haben.
+    // Wir bilden die sichtbare Live-Fläche auf den zentrierten Bereich des Fotos ab.
+    const liveAspect=(video.videoWidth&&video.videoHeight)
+      ? video.videoWidth/video.videoHeight
+      : videoRect.width/videoRect.height;
+    const photoAspect=W/H;
+
+    let baseX=0,baseY=0,baseW=W,baseH=H;
+    if(photoAspect>liveAspect){
+      // Foto ist relativ breiter -> seitlich auf Live-Seitenverhältnis begrenzen.
+      baseW=H*liveAspect;
+      baseX=(W-baseW)/2;
+    }else if(photoAspect<liveAspect){
+      // Foto ist relativ höher -> oben/unten auf Live-Seitenverhältnis begrenzen.
+      baseH=W/liveAspect;
+      baseY=(H-baseH)/2;
+    }
+
+    const x=Math.max(0,baseX+nx*baseW);
+    const y=Math.max(0,baseY+ny*baseH);
+    const w=Math.min(W-x,nw*baseW);
+    const h=Math.min(H-y,nh*baseH);
     const scale=4;
 
     const crop=document.createElement('canvas');
@@ -322,7 +358,7 @@ async function scanSource(sourceCanvas){
     preview.style.display='block';
 
     if($('diag')){
-      $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OCR läuft …';
+      $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · OCR läuft …';
     }
     setStatus('High-Resolution-Kartennummer wird gelesen …');
 
@@ -353,12 +389,12 @@ async function scanSource(sourceCanvas){
       $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
       setStatus('Kartennummer erkannt: '+n+' 🎉');
       if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · '+elapsed+' s · Treffer ✅';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · '+elapsed+' s · Treffer ✅';
       }
     }else{
       setStatus('Kein sicherer OP/EB/ST/PRB-Treffer im High-Res-Ausschnitt.');
       if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · '+elapsed+' s · kein sicherer Treffer';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · '+elapsed+' s · kein sicherer Treffer';
       }
     }
   }catch(e){

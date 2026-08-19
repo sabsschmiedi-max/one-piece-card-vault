@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.3.6</title>
+<title>One Piece Card Vault 0.3.7</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:4%;bottom:5%;width:44%;height:28%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:3%;bottom:3%;width:31%;height:18%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -20,7 +20,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.3.6 · schneller Eck-Scanner</div>
+<div class="sub">Version 0.3.7 · Speed-Test mit 1 OCR-Durchlauf</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -40,7 +40,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
 <button class="secondary" id="closeCam">Schließen</button>
 </div>
 <div class="progress" id="prog"><div class="bar" id="bar"></div></div>
-<div id="status" class="hint">Halte die Karte natürlich. Die untere rechte Kartenecke sollte im blauen Rahmen liegen.</div>
+<div id="status" class="hint">Speed-Test: Nur die Kartennummer unten rechts muss im blauen Rahmen liegen.</div>
 <div id="diag" class="hint" style="margin-top:5px;color:#73dda7">Diagnose: App bereit.</div>
 </section>
 
@@ -177,7 +177,7 @@ function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
 async function ocrCanvas(c,label,baseProgress){
   preview.width=c.width; preview.height=c.height;
   preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.3.3.1: '+label+' …'); diag('OCR läuft: '+label);
+  setStatus('OCR 0.3.7: '+label+' …'); diag('OCR läuft: '+label);
   const res=await Tesseract.recognize(c,'eng',{
     logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
   });
@@ -200,85 +200,71 @@ function rotateCanvas(src,deg){
 
 async function scanSource(sourceCanvas){
   resetDetected();
-  prog(true,8);
+  prog(true,12);
+
+  const started=performance.now();
 
   try{
-    const W=sourceCanvas.width, H=sourceCanvas.height;
+    const W=sourceCanvas.width;
+    const H=sourceCanvas.height;
 
-    // Stufe 1: genau dort suchen, wo die Kartennummer bei One Piece meist sitzt:
-    // in der unteren rechten Ecke der Karte. Nur 3 schnelle OCR-Versuche.
-    const attempts=[
-      {x:.58,y:.72,w:.40,h:.26,scale:8,mode:'color',    label:'Ecke rechts unten'},
-      {x:.58,y:.72,w:.40,h:.26,scale:8,mode:'contrast', label:'Ecke rechts unten Kontrast'},
-      {x:.52,y:.68,w:.46,h:.30,scale:7,mode:'hard',     label:'Ecke rechts unten SW'}
-    ];
+    // SPEED-TEST 0.3.7:
+    // nur EIN kleiner Ausschnitt unten rechts + EIN OCR-Durchlauf.
+    // Der Ausschnitt ist bewusst eng um die typische Karten-ID herum.
+    const x=W*0.68;
+    const y=H*0.82;
+    const w=W*0.30;
+    const h=H*0.16;
 
-    const votes=new Map();
-    const addVote=n=>{
-      if(!n) return 0;
-      const c=(votes.get(n)||0)+1;
-      votes.set(n,c);
-      return c;
-    };
+    const crop=makeCrop(sourceCanvas,x,y,w,h,9,'contrast');
 
-    for(let i=0;i<attempts.length;i++){
-      const a=attempts[i];
-      const crop=makeCrop(sourceCanvas,W*a.x,H*a.y,W*a.w,H*a.h,a.scale,a.mode);
-      const text=await ocrCanvas(crop,a.label,15+i*22);
-      const n=normalize(text);
-      const count=addVote(n);
+    // Vorschau dieses exakten OCR-Bereichs anzeigen
+    preview.width=crop.width;
+    preview.height=crop.height;
+    preview.getContext('2d').drawImage(crop,0,0);
+    preview.style.display='block';
 
-      if(n && count>=2){
-        $('number').value=n;
-        $('set').value=n.startsWith('P-')?'P':n.split('-')[0];
-        $('lookup').innerHTML='<span class="ok">✅ Bestätigt erkannt: '+n+'</span>';
-        setStatus('Kartennummer erkannt: '+n+' 🎉');
-        if($('diag')) $('diag').textContent='Diagnose: Treffer nach '+(i+1)+' schnellen OCR-Durchläufen ✅';
-        prog(false);
-        return;
+    if($('diag')) $('diag').textContent='Diagnose: 1 OCR-Durchlauf gestartet …';
+    setStatus('Schneller OCR-Test läuft …');
+
+    const res=await Tesseract.recognize(
+      crop,
+      'eng',
+      {
+        logger:m=>{
+          if(m.progress){
+            prog(true,Math.min(96,15+Math.round(m.progress*80)));
+          }
+        }
       }
-    }
+    );
 
-    // Stufe 2: nur wenn Stufe 1 nicht reicht, prüfen wir 180° und 90°,
-    // aber ebenfalls nur die relevante Ecke. Maximal 2 zusätzliche OCR-Läufe.
-    const fallback=[
-      {deg:180, x:.58,y:.72,w:.40,h:.26,scale:8,mode:'contrast',label:'Fallback 180°'},
-      {deg:90,  x:.52,y:.68,w:.46,h:.30,scale:7,mode:'contrast',label:'Fallback 90°'}
-    ];
+    const elapsed=((performance.now()-started)/1000).toFixed(1);
+    const raw=(res.data.text||'').trim();
+    const n=normalize(raw);
 
-    for(let j=0;j<fallback.length;j++){
-      const a=fallback[j];
-      const oriented=rotateCanvas(sourceCanvas,a.deg);
-      const OW=oriented.width, OH=oriented.height;
-      const crop=makeCrop(oriented,OW*a.x,OH*a.y,OW*a.w,OH*a.h,a.scale,a.mode);
-      const text=await ocrCanvas(crop,a.label,75+j*10);
-      const n=normalize(text);
-      const count=addVote(n);
-
-      if(n && count>=2){
-        $('number').value=n;
-        $('set').value=n.startsWith('P-')?'P':n.split('-')[0];
-        $('lookup').innerHTML='<span class="ok">✅ Bestätigt erkannt: '+n+'</span>';
-        setStatus('Kartennummer erkannt: '+n+' 🎉');
-        if($('diag')) $('diag').textContent='Diagnose: bestätigt nach '+(attempts.length+j+1)+' OCR-Durchläufen ✅';
-        prog(false);
-        return;
+    if(n){
+      $('number').value=n;
+      $('set').value=n.startsWith('P-')?'P':n.split('-')[0];
+      $('lookup').innerHTML='<span class="ok">✅ Erkannt: '+n+'</span>';
+      setStatus('Kartennummer erkannt: '+n+' 🎉');
+      if($('diag')){
+        $('diag').textContent='Diagnose: 1 OCR-Durchlauf · '+elapsed+' s · Treffer ✅';
       }
-    }
-
-    const ranked=[...votes.entries()].sort((a,b)=>b[1]-a[1]);
-    if(ranked.length){
-      const [candidate,count]=ranked[0];
-      setStatus('Möglicher Treffer '+candidate+' – bitte noch einmal scannen.');
-      if($('diag')) $('diag').textContent='Diagnose: '+candidate+' nur '+count+'× erkannt · schneller Scan beendet.';
     }else{
-      setStatus('Keine plausible Kartennummer erkannt. Halte die Karte wie auf dem letzten Testbild und scanne erneut.');
-      if($('diag')) $('diag').textContent='Diagnose: 5 schnelle OCR-Durchläufe · kein gültiger Treffer.';
+      setStatus('Kein sicherer Treffer in diesem Ausschnitt.');
+      if($('diag')){
+        $('diag').textContent='Diagnose: 1 OCR-Durchlauf · '+elapsed+' s · kein Treffer';
+      }
     }
+
   }catch(e){
+    const elapsed=((performance.now()-started)/1000).toFixed(1);
     console.error(e);
-    setStatus('OCR-Fehler. Bitte erneut versuchen.');
-    if($('diag')) $('diag').textContent='Diagnose: '+(e?.message||e);
+    setStatus('OCR-Fehler.');
+    if($('diag')){
+      $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
+    }
   }finally{
     prog(false);
   }

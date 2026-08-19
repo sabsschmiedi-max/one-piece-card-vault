@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.3</title>
+<title>One Piece Card Vault 0.4.4</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:2.5%;bottom:3%;width:40%;height:10%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:4%;bottom:18%;width:42%;height:12%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -39,7 +39,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.3 · High-Res Guide-Mapping Fix</div>
+<div class="sub">Version 0.4.4 · sichtbarer Zielrahmen + OP-Code-OCR</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -98,38 +98,39 @@ function normalize(text){
     .replace(/\s+/g,'')
     .replace(/[|]/g,'1');
 
-  const fix=x=>x
+  const fixDigits=x=>x
     .replace(/O/g,'0')
     .replace(/[IL]/g,'1')
     .replace(/S/g,'5')
     .replace(/B/g,'8');
 
-  // Hauptformate zuerst und ausschließlich als sichere Treffer:
-  // OPxx-xxx, EBxx-xxx, STxx-xxx, PRBxx-xxx
-  const prefixes=['OP','EB','ST','PRB'];
+  // Primär: OPxx-xxx
+  const opPatterns=[
+    /OP-?([0-9OILSB]{2})-?([0-9OILSB]{3})/,
+    /0P-?([0-9OILSB]{2})-?([0-9OILSB]{3})/,
+    /O[P]?([0-9OILSB]{2})-?([0-9OILSB]{3})/
+  ];
 
-  for(const pre of prefixes){
-    const pos=raw.indexOf(pre);
-    if(pos>=0){
-      let tail=raw.slice(pos+pre.length,pos+pre.length+12).replace(/-/g,'');
-      tail=fix(tail);
-      const m=tail.match(/\d{5}/);
-      if(m){
-        const n=pre+m[0].slice(0,2)+'-'+m[0].slice(2,5);
-        return isPlausibleMain(n)?n:'';
-      }
+  for(const p of opPatterns){
+    const m=raw.match(p);
+    if(m){
+      const set=fixDigits(m[1]);
+      const card=fixDigits(m[2]);
+      const n='OP'+set+'-'+card;
+      if(isPlausibleMain(n)) return n;
     }
   }
 
-  // Lockerer OP-Fallback für typische OCR-Fehler wie 0P16-105 / OPI6-105
-  const loose=raw.match(/[O0][P]?[-]?([0-9OILSB]{2})[-]?([0-9OILSB]{3})/);
-  if(loose){
-    const n='OP'+fix(loose[1])+'-'+fix(loose[2]);
-    return isPlausibleMain(n)?n:'';
+  // Andere reguläre One-Piece-Sets
+  for(const pre of ['EB','ST','PRB']){
+    const p=new RegExp(pre+'-?([0-9OILSB]{2})-?([0-9OILSB]{3})');
+    const m=raw.match(p);
+    if(m){
+      const n=pre+fixDigits(m[1])+'-'+fixDigits(m[2]);
+      if(isPlausibleMain(n)) return n;
+    }
   }
 
-  // Promo P-xxx absichtlich NICHT mehr automatisch als sicher akzeptieren.
-  // So verhindern wir falsche Treffer wie P-171 auf normalen OP-Karten.
   return '';
 }
 
@@ -300,27 +301,20 @@ async function scanSource(sourceCanvas){
     const W=sourceCanvas.width;
     const H=sourceCanvas.height;
 
-    // 0.4.3: Den High-Res-Ausschnitt aus der TATSÄCHLICHEN Position
-    // des blauen Rahmens ableiten, statt feste Foto-Koordinaten zu verwenden.
-    // takePhoto() kann ein anderes Seitenverhältnis/FOV als die Live-Vorschau liefern.
-    const wrap=$('guide').parentElement;
+    // 0.4.4: derselbe High-Res-Guide-Mapping-Ausschnitt wie 0.4.3
     const guideRect=$('guide').getBoundingClientRect();
     const videoRect=video.getBoundingClientRect();
 
-    // Position des Guides relativ zur sichtbaren Video-Fläche.
     let nx=(guideRect.left-videoRect.left)/videoRect.width;
     let ny=(guideRect.top-videoRect.top)/videoRect.height;
     let nw=guideRect.width/videoRect.width;
     let nh=guideRect.height/videoRect.height;
 
-    // Sicherheitsrand: Nummer sitzt oft ganz unten/rechts auf der Karte.
-    nx=Math.max(0,nx-0.025);
+    nx=Math.max(0,nx-0.035);
     ny=Math.max(0,ny-0.025);
-    nw=Math.min(1-nx,nw+0.05);
+    nw=Math.min(1-nx,nw+0.07);
     nh=Math.min(1-ny,nh+0.05);
 
-    // Live-Vorschau und Foto können verschiedene Seitenverhältnisse haben.
-    // Wir bilden die sichtbare Live-Fläche auf den zentrierten Bereich des Fotos ab.
     const liveAspect=(video.videoWidth&&video.videoHeight)
       ? video.videoWidth/video.videoHeight
       : videoRect.width/videoRect.height;
@@ -328,11 +322,9 @@ async function scanSource(sourceCanvas){
 
     let baseX=0,baseY=0,baseW=W,baseH=H;
     if(photoAspect>liveAspect){
-      // Foto ist relativ breiter -> seitlich auf Live-Seitenverhältnis begrenzen.
       baseW=H*liveAspect;
       baseX=(W-baseW)/2;
     }else if(photoAspect<liveAspect){
-      // Foto ist relativ höher -> oben/unten auf Live-Seitenverhältnis begrenzen.
       baseH=W/liveAspect;
       baseY=(H-baseH)/2;
     }
@@ -341,14 +333,14 @@ async function scanSource(sourceCanvas){
     const y=Math.max(0,baseY+ny*baseH);
     const w=Math.min(W-x,nw*baseW);
     const h=Math.min(H-y,nh*baseH);
-    const scale=4;
 
+    const scale=4;
     const crop=document.createElement('canvas');
     crop.width=Math.max(1,Math.round(w*scale));
     crop.height=Math.max(1,Math.round(h*scale));
     const ctx=crop.getContext('2d');
 
-    // Nearest-neighbour verhindert zusätzliches Weichzeichnen kleiner Schrift.
+    // Originalfarbe, kein Weichzeichnen
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(sourceCanvas,x,y,w,h,0,0,crop.width,crop.height);
 
@@ -357,31 +349,36 @@ async function scanSource(sourceCanvas){
     preview.getContext('2d').drawImage(crop,0,0);
     preview.style.display='block';
 
-    if($('diag')){
-      $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · OCR läuft …';
-    }
-    setStatus('High-Resolution-Kartennummer wird gelesen …');
+    if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR läuft …';
+    setStatus('OP-Kartennummer wird gelesen …');
 
-    const res=await Tesseract.recognize(
-      crop,
-      'eng',
-      {
-        logger:m=>{
-          if(m.progress){
-            prog(true,Math.min(96,15+Math.round(m.progress*80)));
-          }
-        }
-      },
-      {
-        tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-        tessedit_pageseg_mode:'7',
-        preserve_interword_spaces:'0'
-      }
+    const commonOpts={
+      tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
+      preserve_interword_spaces:'0'
+    };
+
+    // Pass 1: einzelne Textzeile
+    let res=await Tesseract.recognize(
+      crop,'eng',
+      {logger:m=>{if(m.progress) prog(true,Math.min(72,15+Math.round(m.progress*50))) }},
+      {...commonOpts,tessedit_pageseg_mode:'7'}
     );
 
+    let raw=(res.data.text||'').trim();
+    let n=normalize(raw);
+
+    // Pass 2 nur wenn nötig: sparse text - immer noch derselbe kleine Crop
+    if(!n){
+      res=await Tesseract.recognize(
+        crop,'eng',
+        {logger:m=>{if(m.progress) prog(true,Math.min(96,70+Math.round(m.progress*25))) }},
+        {...commonOpts,tessedit_pageseg_mode:'11'}
+      );
+      raw+=' '+(res.data.text||'').trim();
+      n=normalize(raw);
+    }
+
     const elapsed=((performance.now()-started)/1000).toFixed(1);
-    const raw=(res.data.text||'').trim();
-    const n=normalize(raw);
 
     if(n){
       $('number').value=n;
@@ -389,21 +386,19 @@ async function scanSource(sourceCanvas){
       $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+n+'</span>';
       setStatus('Kartennummer erkannt: '+n+' 🎉');
       if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · '+elapsed+' s · Treffer ✅';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR · '+elapsed+' s · Treffer ✅';
       }
     }else{
       setStatus('Kein sicherer OP/EB/ST/PRB-Treffer im High-Res-Ausschnitt.');
       if($('diag')){
-        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Guide-Mapping · '+elapsed+' s · kein sicherer Treffer';
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · OP-Code-OCR · '+elapsed+' s · kein sicherer Treffer';
       }
     }
   }catch(e){
     const elapsed=((performance.now()-started)/1000).toFixed(1);
     console.error(e);
     setStatus('OCR-/Aufnahmefehler.');
-    if($('diag')){
-      $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
-    }
+    if($('diag')) $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
   }finally{
     prog(false);
   }

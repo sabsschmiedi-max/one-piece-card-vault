@@ -10,7 +10,7 @@
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:2.5%;bottom:2.5%;width:30%;height:10%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:2.5%;bottom:2.2%;width:42%;height:8.5%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -39,7 +39,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.3.9 · Originalbild-Mikro-OCR + fester Scan-Button</div>
+<div class="sub">Version 0.4.0 · gezielte OP-Nummernerkennung + fester Scan-Button</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -93,43 +93,59 @@ function setStatus(s){$('status').textContent=s}
 function diag(s){$('diag').textContent='Diagnose: '+s}
 function prog(show,n=0){$('prog').style.display=show?'block':'none';$('bar').style.width=n+'%'}
 function normalize(text){
-  const raw=String(text||'').toUpperCase()
+  let raw=String(text||'').toUpperCase()
     .replace(/[—–_]/g,'-')
-    .replace(/\s+/g,'')
-    .replace(/[|]/g,'1');
+    .replace(/[|!]/g,'1')
+    .replace(/\s+/g,'');
 
-  const fix=x=>x
-    .replace(/O/g,'0')
-    .replace(/[IL]/g,'1')
+  // Häufige OCR-Verwechslungen im Präfix.
+  raw=raw
+    .replace(/0P/g,'OP')
+    .replace(/O[P]?I(?=\d)/g,'OP1')
+    .replace(/OPI/g,'OP1')
+    .replace(/0PI/g,'OP1')
+    .replace(/OPl/g,'OP1');
+
+  const digitFix=x=>String(x)
+    .replace(/[OQDG]/g,'0')
+    .replace(/[ILJT]/g,'1')
+    .replace(/Z/g,'2')
     .replace(/S/g,'5')
     .replace(/B/g,'8');
 
+  // OP / EB / ST / PRB mit oder ohne Bindestrich und mit OCR-Fehlern.
+  const candidates=[
+    /(?:OP|0P|O[P]?)[-]?([0-9OQDGILJTZSB]{2})[-]?([0-9OQDGILJTZSB]{3})/,
+    /(?:EB)[-]?([0-9OQDGILJTZSB]{2})[-]?([0-9OQDGILJTZSB]{3})/,
+    /(?:ST)[-]?([0-9OQDGILJTZSB]{2})[-]?([0-9OQDGILJTZSB]{3})/,
+    /(?:PRB)[-]?([0-9OQDGILJTZSB]{2})[-]?([0-9OQDGILJTZSB]{3})/
+  ];
   const prefixes=['OP','EB','ST','PRB'];
 
-  for(const pre of prefixes){
-    const pos=raw.indexOf(pre);
-    if(pos>=0){
-      let tail=fix(raw.slice(pos+pre.length,pos+pre.length+12).replace(/-/g,''));
-      const m=tail.match(/\d{5}/);
-      if(m){
-        const n=pre+m[0].slice(0,2)+'-'+m[0].slice(2,5);
-        return isPlausible(n)?n:'';
-      }
+  for(let i=0;i<candidates.length;i++){
+    const m=raw.match(candidates[i]);
+    if(m){
+      const n=prefixes[i]+digitFix(m[1])+'-'+digitFix(m[2]);
+      if(isPlausible(n)) return n;
     }
   }
 
-  const promo=raw.match(/P-?([0-9OILSB]{3})/);
+  const promo=raw.match(/P-?([0-9OQDGILJTZSB]{3})/);
   if(promo){
-    const n='P-'+fix(promo[1]);
-    return isPlausible(n)?n:'';
+    const n='P-'+digitFix(promo[1]);
+    if(isPlausible(n)) return n;
   }
 
-  const loose=raw.match(/[O0]P?-?([0-9OILSB]{2})-?([0-9OILSB]{3})/);
-  if(loose){
-    const n='OP'+fix(loose[1])+'-'+fix(loose[2]);
-    return isPlausible(n)?n:'';
+  // Letzter Rettungsversuch: fünf nummernartige Zeichen nahe "OP".
+  const pos=Math.max(raw.indexOf('OP'),raw.indexOf('0P'));
+  if(pos>=0){
+    const tail=digitFix(raw.slice(pos+2,pos+16).replace(/-/g,''));
+    const m=tail.match(/\d{5}/);
+    if(m){
+      const n='OP'+m[0].slice(0,2)+'-'+m[0].slice(2);
+      if(isPlausible(n)) return n;
+    }
   }
-
   return '';
 }
 
@@ -159,7 +175,7 @@ async function startCam(){
     video.srcObject=stream;
     $('camBtns').style.display='flex';
     $('guide').style.display='block';
-    setStatus('Kamera läuft. Richte die komplette Kartenunterkante in den gestrichelten Rahmen.');
+    setStatus('Kamera läuft. Ganze Karte sichtbar lassen – die Nummer unten rechts ungefähr in den blauen Bereich bringen.');
     diag('Kamera geöffnet ✅');
   }catch(e){
     console.error(e);
@@ -250,79 +266,80 @@ function makeReadableCrop(sourceCanvas,x,y,w,h,scale=10){
 
 async function scanSource(sourceCanvas){
   resetDetected();
-  prog(true,12);
+  prog(true,8);
   const started=performance.now();
 
   try{
-    const W=sourceCanvas.width;
-    const H=sourceCanvas.height;
+    const W=sourceCanvas.width, H=sourceCanvas.height;
 
-    // 0.3.9: Original-Farbbild, nur ein sehr schmaler Streifen unten rechts.
-    // Keine Graustufen-/Kontrast-/SW-Verarbeitung.
-    const x=W*0.70;
-    const y=H*0.88;
-    const w=W*0.28;
-    const h=H*0.085;
-    const scale=12;
+    // 0.4.0: breiter, flacher Streifen unten rechts.
+    // Die Karte darf komplett im Kamerabild bleiben.
+    const regions=[
+      {x:.55,y:.865,w:.43,h:.105,scale:9,label:'Nummernstreifen'},
+      {x:.48,y:.835,w:.50,h:.145,scale:7,label:'Fallback'}
+    ];
 
-    const crop=document.createElement('canvas');
-    crop.width=Math.max(1,Math.round(w*scale));
-    crop.height=Math.max(1,Math.round(h*scale));
-    const ctx=crop.getContext('2d');
-    ctx.imageSmoothingEnabled=true;
-    ctx.imageSmoothingQuality='high';
-    ctx.drawImage(sourceCanvas,x,y,w,h,0,0,crop.width,crop.height);
+    let found='', rawTexts=[], used=0;
 
-    preview.width=crop.width;
-    preview.height=crop.height;
-    preview.getContext('2d').drawImage(crop,0,0);
-    preview.style.display='block';
+    for(let i=0;i<regions.length && !found;i++){
+      const r=regions[i];
+      const crop=document.createElement('canvas');
+      crop.width=Math.max(1,Math.round(W*r.w*r.scale));
+      crop.height=Math.max(1,Math.round(H*r.h*r.scale));
+      const ctx=crop.getContext('2d');
+      ctx.imageSmoothingEnabled=true;
+      ctx.imageSmoothingQuality='high';
+      ctx.drawImage(sourceCanvas,W*r.x,H*r.y,W*r.w,H*r.h,0,0,crop.width,crop.height);
 
-    if($('diag')) $('diag').textContent='Diagnose: Originalbild-Mikro-OCR läuft …';
-    setStatus('Originalbild-Mikro-OCR läuft …');
+      // Vorschau zeigt genau, was OCR bekommt.
+      preview.width=crop.width; preview.height=crop.height;
+      preview.getContext('2d').drawImage(crop,0,0);
+      preview.style.display='block';
 
-    const res=await Tesseract.recognize(
-      crop,
-      'eng',
-      {
-        logger:m=>{
+      used=i+1;
+      setStatus('Suche gezielt nach OPxx-xxx …');
+      if($('diag')) $('diag').textContent='Diagnose: '+r.label+' · OCR '+used+'/2 …';
+
+      const res=await Tesseract.recognize(
+        crop,'eng',
+        {logger:m=>{
           if(m.progress){
-            prog(true,Math.min(96,15+Math.round(m.progress*80)));
+            const base=i===0?10:55;
+            prog(true,Math.min(96,base+Math.round(m.progress*38)));
           }
+        }},
+        {
+          tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-',
+          tessedit_pageseg_mode:'7',
+          preserve_interword_spaces:'1'
         }
-      },
-      {
-        tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
-        tessedit_pageseg_mode:'7',
-        preserve_interword_spaces:'0'
-      }
-    );
+      );
+
+      const raw=(res.data.text||'').trim();
+      rawTexts.push(raw);
+      found=normalize(raw);
+    }
 
     const elapsed=((performance.now()-started)/1000).toFixed(1);
-    const raw=(res.data.text||'').trim();
-    const n=normalize(raw);
 
-    if(n){
-      $('number').value=n;
-      $('set').value=n.startsWith('P-')?'P':n.split('-')[0];
-      $('lookup').innerHTML='<span class="ok">✅ Erkannt: '+n+'</span>';
-      setStatus('Kartennummer erkannt: '+n+' 🎉');
-      if($('diag')){
-        $('diag').textContent='Diagnose: 1 Originalbild-OCR · '+elapsed+' s · Treffer ✅';
-      }
+    if(found){
+      $('number').value=found;
+      $('set').value=found.startsWith('P-')?'P':found.split('-')[0];
+      $('lookup').innerHTML='<span class="ok">✅ Erkannt: '+found+'</span>';
+      setStatus('Kartennummer erkannt: '+found+' 🎉');
+      $('diag').textContent='Diagnose: '+used+' gezielte OCR'+(used>1?'-Versuche':'-Versuch')+
+        ' · '+elapsed+' s · Treffer ✅';
     }else{
-      setStatus('Kein sicherer Treffer im Mikro-Ausschnitt.');
-      if($('diag')){
-        $('diag').textContent='Diagnose: 1 Originalbild-OCR · '+elapsed+' s · kein Treffer';
-      }
+      setStatus('Noch kein sicherer Treffer. Karte ruhig halten und erneut scannen.');
+      const sample=rawTexts.join(' | ').replace(/\s+/g,' ').slice(0,70);
+      $('diag').textContent='Diagnose: '+used+' gezielte OCR-Versuche · '+elapsed+
+        ' s · kein Treffer'+(sample?' · gelesen: '+sample:'');
     }
   }catch(e){
     const elapsed=((performance.now()-started)/1000).toFixed(1);
     console.error(e);
     setStatus('OCR-Fehler.');
-    if($('diag')){
-      $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
-    }
+    $('diag').textContent='Diagnose: Fehler nach '+elapsed+' s · '+(e?.message||e);
   }finally{
     prog(false);
   }

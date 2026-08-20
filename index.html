@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.5.1</title>
+<title>One Piece Card Vault 0.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -40,7 +40,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.5.1 · bestätigte Mehrfach-OCR + Rohdiagnose</div>
+<div class="sub">Version 0.5.2 · OR→OP-Korrektur + sichere Mehrfachbestätigung</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -106,18 +106,20 @@ function normalize(text){
     .replace(/Z/g,'2')
     .replace(/G/g,'6');
 
-  // 0.5.1: Code darf mitten in OCR-Kauderwelsch stehen.
-  // Typische Varianten: OP16-105, op16 105, 0P16-105, OPI6-105.
   const compact=raw.replace(/\s+/g,' ');
 
-  const patterns=[
+  // 0.5.2: typische OP-Präfix-Fehler inklusive OR/0R.
+  // Beispiel: "or16-07208" -> "OP16-072".
+  const opPatterns=[
     /OP[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
     /0P[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
     /QP[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
-    /O[PIL1][^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/
+    /OR[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
+    /0R[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
+    /O[PIL1R][^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/
   ];
 
-  for(const p of patterns){
+  for(const p of opPatterns){
     const m=compact.match(p);
     if(m){
       const n='OP'+fixDigits(m[1])+'-'+fixDigits(m[2]);
@@ -213,7 +215,7 @@ function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
 async function ocrCanvas(c,label,baseProgress){
   preview.width=c.width; preview.height=c.height;
   preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.5.1: '+label+' …'); diag('OCR läuft: '+label);
+  setStatus('OCR 0.5.2: '+label+' …'); diag('OCR läuft: '+label);
   const res=await Tesseract.recognize(c,'eng',{
     logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
   });
@@ -329,7 +331,7 @@ async function scanSource(sourceCanvas){
 
   try{
     const W=sourceCanvas.width, H=sourceCanvas.height;
-    setStatus('Sichere Mehrfachprüfung läuft …');
+    setStatus('Sichere Mehrfachprüfung 0.5.2 läuft …');
 
     const guideRect=$('guide').getBoundingClientRect();
     const videoRect=video.getBoundingClientRect();

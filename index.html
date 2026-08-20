@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.9</title>
+<title>One Piece Card Vault 0.5.0</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -40,7 +40,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.9 · tolerantere OP-Code-OCR + Scan-Button blendet nach Scan aus</div>
+<div class="sub">Version 0.5.0 · sichere Mehrfachbestätigung statt OCR-Raten</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -94,10 +94,10 @@ function setStatus(s){$('status').textContent=s}
 function diag(s){$('diag').textContent='Diagnose: '+s}
 function prog(show,n=0){$('prog').style.display=show?'block':'none';$('bar').style.width=n+'%'}
 function normalize(text){
-  let raw=String(text||'').toUpperCase()
+  const raw=String(text||'').toUpperCase()
     .replace(/[—–_]/g,'-')
-    .replace(/[|]/g,'1')
-    .replace(/\s+/g,' ');
+    .replace(/\s+/g,' ')
+    .replace(/[|]/g,'1');
 
   const fixDigits=x=>x
     .replace(/O/g,'0')
@@ -107,26 +107,23 @@ function normalize(text){
     .replace(/Z/g,'2')
     .replace(/G/g,'6');
 
-  // 0.4.9: tolerate spaces, dots, stray symbols and common OP misreads.
-  // Examples accepted: OP16-105, OP16 105, 0P16-105, P16-105.
-  const compact=raw.replace(/[^A-Z0-9]/g,'');
-  const candidates=[raw, compact];
+  // Nur dann einen OP-Code akzeptieren, wenn ein OP-artiger Präfix
+  // tatsächlich im OCR-Text vorkommt. Kein "5 Ziffern = OP-Code"-Raten mehr.
+  const patterns=[
+    /OP[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})/,
+    /0P[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})/,
+    /QP[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})/
+  ];
 
-  for(const t of candidates){
-    const m=t.match(/(?:O[PFR]?|0P|QP|P)[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})/);
+  for(const p of patterns){
+    const m=raw.match(p);
     if(m){
       const n='OP'+fixDigits(m[1])+'-'+fixDigits(m[2]);
       if(isPlausibleMain(n)) return n;
     }
   }
 
-  // Last-resort: if OCR clearly sees the 2+3 digit structure in this tiny OP code zone.
-  const loose=compact.match(/([0-9OILSBZG]{2})([0-9OILSBZG]{3})/);
-  if(loose){
-    const n='OP'+fixDigits(loose[1])+'-'+fixDigits(loose[2]);
-    if(isPlausibleMain(n)) return n;
-  }
-
+  // Andere reguläre Sets, ebenfalls nur mit vorhandenem Präfix.
   for(const pre of ['EB','ST','PRB']){
     const p=new RegExp(pre+'[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})');
     const m=raw.match(p);
@@ -135,6 +132,7 @@ function normalize(text){
       if(isPlausibleMain(n)) return n;
     }
   }
+
   return '';
 }
 
@@ -214,7 +212,7 @@ function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
 async function ocrCanvas(c,label,baseProgress){
   preview.width=c.width; preview.height=c.height;
   preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.4.9: '+label+' …'); diag('OCR läuft: '+label);
+  setStatus('OCR 0.5.0: '+label+' …'); diag('OCR läuft: '+label);
   const res=await Tesseract.recognize(c,'eng',{
     logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
   });
@@ -325,16 +323,14 @@ function makeCodeCrop(sourceCanvas,x,y,w,h,scale=6,mode='gray'){
 
 async function scanSource(sourceCanvas){
   resetDetected();
-  prog(true,10);
+  prog(true,8);
   const started=performance.now();
 
   try{
     const W=sourceCanvas.width, H=sourceCanvas.height;
-    setStatus('Gezielte Kartennummer-Erkennung läuft …');
-    if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Code-Zone wird vorbereitet …';
+    setStatus('Sichere Mehrfachprüfung läuft …');
 
-    // 0.4.7: Guide-Mapping wieder als Orientierung verwenden,
-    // aber den High-Res-Ausschnitt etwas großzügiger nehmen.
+    // Guide-Mapping wie bisher
     const guideRect=$('guide').getBoundingClientRect();
     const videoRect=video.getBoundingClientRect();
 
@@ -367,65 +363,89 @@ async function scanSource(sourceCanvas){
     const gw=Math.min(W-gx,nw*baseW);
     const gh=Math.min(H-gy,nh*baseH);
 
-    // Innerhalb dieser Zone sitzt die Kartennummer auf normalen OP-Karten
-    // sehr weit unten/rechts. Diesen Teil vergrößern wir gezielt.
-    const x=Math.max(0,gx+gw*0.28);
-    const y=Math.max(0,gy+gh*0.48);
-    const w=Math.min(W-x,gw*0.72);
-    const h=Math.min(H-y,gh*0.52);
+    // Code-Zone etwas breiter als bisher.
+    const x=Math.max(0,gx+gw*0.18);
+    const y=Math.max(0,gy+gh*0.42);
+    const w=Math.min(W-x,gw*0.82);
+    const h=Math.min(H-y,gh*0.58);
 
     const commonOpts={
       tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-',
       preserve_interword_spaces:'0'
     };
 
-    let rawAll='';
-    let found='';
+    const variants=[
+      {mode:'color', psm:'7', label:'Original'},
+      {mode:'gray',  psm:'7', label:'Kontrast'},
+      {mode:'gray',  psm:'6', label:'Block'}
+    ];
 
-    // Pass 1: Originalfarbe, kleine Code-Zone.
-    const crop1=makeCodeCrop(sourceCanvas,x,y,w,h,6,'color');
-    preview.width=crop1.width;
-    preview.height=crop1.height;
-    preview.getContext('2d').drawImage(crop1,0,0);
-    preview.style.display='block';
+    const votes=new Map();
+    const rawSeen=[];
+    let passes=0;
 
-    let res=await Tesseract.recognize(
-      crop1,'eng',
-      {logger:m=>{if(m.progress)prog(true,Math.min(60,12+Math.round(m.progress*45))) }},
-      {...commonOpts,tessedit_pageseg_mode:'7'}
-    );
+    for(const v of variants){
+      passes++;
+      const crop=makeCodeCrop(sourceCanvas,x,y,w,h,6,v.mode);
 
-    rawAll=(res.data.text||'').trim();
-    found=normalize(rawAll);
+      preview.width=crop.width;
+      preview.height=crop.height;
+      preview.getContext('2d').drawImage(crop,0,0);
+      preview.style.display='block';
 
-    // Pass 2 nur wenn nötig: gleicher Ausschnitt, moderat kontrastiert.
-    if(!found){
-      const crop2=makeCodeCrop(sourceCanvas,x,y,w,h,6,'gray');
-      preview.width=crop2.width;
-      preview.height=crop2.height;
-      preview.getContext('2d').drawImage(crop2,0,0);
+      if($('diag')){
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Prüfung '+passes+'/3 ('+v.label+') …';
+      }
 
-      res=await Tesseract.recognize(
-        crop2,'eng',
-        {logger:m=>{if(m.progress)prog(true,Math.min(96,58+Math.round(m.progress*35))) }},
-        {...commonOpts,tessedit_pageseg_mode:'6'}
+      const res=await Tesseract.recognize(
+        crop,'eng',
+        {logger:m=>{
+          if(m.progress){
+            const base=[10,38,68][passes-1];
+            const span=[25,25,24][passes-1];
+            prog(true,Math.min(96,base+Math.round(m.progress*span)));
+          }
+        }},
+        {...commonOpts,tessedit_pageseg_mode:v.psm}
       );
 
-      rawAll+=' '+(res.data.text||'').trim();
-      found=normalize(rawAll);
+      const raw=(res.data.text||'').trim();
+      rawSeen.push(raw);
+      const n=normalize(raw);
+
+      if(n){
+        votes.set(n,(votes.get(n)||0)+1);
+
+        // Nur 2 identische Ergebnisse gelten als sicher.
+        if(votes.get(n)>=2){
+          const elapsed=((performance.now()-started)/1000).toFixed(1);
+          $('number').value=n;
+          $('set').value=n.split('-')[0];
+          $('lookup').innerHTML='<span class="ok">✅ Bestätigt erkannt: '+n+'</span>';
+          setStatus('Kartennummer bestätigt: '+n+' 🎉');
+          if($('diag')){
+            $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · '+passes+' OCR-Läufe · '+elapsed+' s · 2× bestätigt ✅';
+          }
+          prog(false);
+          return;
+        }
+      }
     }
 
     const elapsed=((performance.now()-started)/1000).toFixed(1);
+    const ranked=[...votes.entries()].sort((a,b)=>b[1]-a[1]);
 
-    if(found){
-      $('number').value=found;
-      $('set').value=found.split('-')[0];
-      $('lookup').innerHTML='<span class="ok">✅ Sicher erkannt: '+found+'</span>';
-      setStatus('Kartennummer erkannt: '+found+' 🎉');
-      if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Code-Zonen-OCR · '+elapsed+' s · Treffer ✅';
+    if(ranked.length){
+      const [candidate,count]=ranked[0];
+      setStatus('Unsicher: '+candidate+' wurde nur '+count+'× gelesen. Nicht übernommen.');
+      if($('diag')){
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · 3 OCR-Läufe · '+elapsed+' s · keine 2-fache Übereinstimmung';
+      }
     }else{
-      setStatus('Kein sicherer OP/EB/ST/PRB-Treffer in der Code-Zone.');
-      if($('diag')) $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · Code-Zonen-OCR · '+elapsed+' s · kein sicherer Treffer';
+      setStatus('Kein sicherer Kartencode erkannt.');
+      if($('diag')){
+        $('diag').textContent='Diagnose: High-Res '+W+'×'+H+' · 3 OCR-Läufe · '+elapsed+' s · kein verwertbarer Code';
+      }
     }
   }catch(e){
     const elapsed=((performance.now()-started)/1000).toFixed(1);

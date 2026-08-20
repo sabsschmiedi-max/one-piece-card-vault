@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.8</title>
+<title>One Piece Card Vault 0.4.9</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
@@ -40,7 +40,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.8 · höherer Zielrahmen + smarter Scan-Button</div>
+<div class="sub">Version 0.4.9 · tolerantere OP-Code-OCR + Scan-Button blendet nach Scan aus</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -96,8 +96,8 @@ function prog(show,n=0){$('prog').style.display=show?'block':'none';$('bar').sty
 function normalize(text){
   let raw=String(text||'').toUpperCase()
     .replace(/[—–_]/g,'-')
-    .replace(/\s+/g,'')
-    .replace(/[|]/g,'1');
+    .replace(/[|]/g,'1')
+    .replace(/\s+/g,' ');
 
   const fixDigits=x=>x
     .replace(/O/g,'0')
@@ -107,31 +107,34 @@ function normalize(text){
     .replace(/Z/g,'2')
     .replace(/G/g,'6');
 
-  // OCR kann OP z.B. als 0P, O?, QP oder nur P lesen.
-  const candidates=[
-    raw,
-    raw.replace(/^0P/,'OP'),
-    raw.replace(/^QP/,'OP'),
-    raw.replace(/^P(?=[0-9OILSBZG]{2})/,'OP')
-  ];
+  // 0.4.9: tolerate spaces, dots, stray symbols and common OP misreads.
+  // Examples accepted: OP16-105, OP16 105, 0P16-105, P16-105.
+  const compact=raw.replace(/[^A-Z0-9]/g,'');
+  const candidates=[raw, compact];
 
   for(const t of candidates){
-    const m=t.match(/(?:OP|0P|QP)-?([0-9OILSBZG]{2})-?([0-9OILSBZG]{3})/);
+    const m=t.match(/(?:O[PFR]?|0P|QP|P)[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})/);
     if(m){
       const n='OP'+fixDigits(m[1])+'-'+fixDigits(m[2]);
       if(isPlausibleMain(n)) return n;
     }
   }
 
+  // Last-resort: if OCR clearly sees the 2+3 digit structure in this tiny OP code zone.
+  const loose=compact.match(/([0-9OILSBZG]{2})([0-9OILSBZG]{3})/);
+  if(loose){
+    const n='OP'+fixDigits(loose[1])+'-'+fixDigits(loose[2]);
+    if(isPlausibleMain(n)) return n;
+  }
+
   for(const pre of ['EB','ST','PRB']){
-    const p=new RegExp(pre+'-?([0-9OILSBZG]{2})-?([0-9OILSBZG]{3})');
+    const p=new RegExp(pre+'[^0-9OILSBZG]*([0-9OILSBZG]{2})[^0-9OILSBZG]*([0-9OILSBZG]{3})');
     const m=raw.match(p);
     if(m){
       const n=pre+fixDigits(m[1])+'-'+fixDigits(m[2]);
       if(isPlausibleMain(n)) return n;
     }
   }
-
   return '';
 }
 
@@ -211,7 +214,7 @@ function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
 async function ocrCanvas(c,label,baseProgress){
   preview.width=c.width; preview.height=c.height;
   preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.4.7: '+label+' …'); diag('OCR läuft: '+label);
+  setStatus('OCR 0.4.9: '+label+' …'); diag('OCR läuft: '+label);
   const res=await Tesseract.recognize(c,'eng',{
     logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
   });
@@ -405,7 +408,7 @@ async function scanSource(sourceCanvas){
       res=await Tesseract.recognize(
         crop2,'eng',
         {logger:m=>{if(m.progress)prog(true,Math.min(96,58+Math.round(m.progress*35))) }},
-        {...commonOpts,tessedit_pageseg_mode:'7'}
+        {...commonOpts,tessedit_pageseg_mode:'6'}
       );
 
       rawAll+=' '+(res.data.text||'').trim();
@@ -439,6 +442,8 @@ async function scanLive(){
     setStatus('Bitte zuerst die Kamera öffnen.');
     return;
   }
+  // 0.4.9: after tapping scan, do not cover the result fields.
+  if($('stickyScan')) $('stickyScan').style.display='none';
   if($('diag')) $('diag').textContent='Diagnose: Hochauflösendes Standbild wird aufgenommen …';
   setStatus('High-Res-Aufnahme …');
 

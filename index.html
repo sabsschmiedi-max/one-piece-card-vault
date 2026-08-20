@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.5.2</title>
+<title>One Piece Card Vault 0.5.3</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:5%;bottom:38%;width:44%;height:13%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative;overflow:hidden;border-radius:12px}.guide{position:absolute;right:4%;bottom:30%;width:54%;height:18%;border:2px dashed #36baff;border-radius:12px;pointer-events:none;display:none;box-shadow:0 0 0 9999px rgba(3,10,22,.20),0 0 18px rgba(54,186,255,.45)}.guide:before,.guide:after{content:'';position:absolute;width:28px;height:28px;border-color:#73dda7;border-style:solid}.guide:before{left:-3px;top:-3px;border-width:4px 0 0 4px;border-radius:10px 0 0 0}.guide:after{right:-3px;bottom:-3px;border-width:0 4px 4px 0;border-radius:0 0 10px 0}.guideLabel{position:absolute;left:50%;top:-34px;transform:translateX(-50%);background:rgba(3,16,26,.92);color:#dff6ff;border:1px solid #36baff;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:800;white-space:nowrap}.guideArrow{position:absolute;right:10px;bottom:8px;font-size:20px;line-height:1;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}.cameraHelp{display:none;margin-top:8px;padding:9px 10px;border:1px solid #2d496c;background:#0d172a;border-radius:11px;color:#d9e6f5;font-size:12px;line-height:1.45}.cameraHelp b{color:#73dda7}.cameraSteps{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.cameraStep{flex:1;min-width:140px;background:#0b1527;border:1px solid #243b5b;border-radius:9px;padding:7px 8px;color:#b8c7da;font-size:11px}.cameraStep strong{color:#f6f8fb}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -40,13 +40,13 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.5.2 · OR→OP-Korrektur + sichere Mehrfachbestätigung</div>
+<div class="sub">Version 0.5.3 · bessere Kameraführung + sichere Mehrfachbestätigung</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
 <div class="cameraWrap">
 <video id="video" autoplay playsinline></video>
-<div id="guide" class="guide"></div>
+<div id="guide" class="guide"><div class="guideLabel">Kartennummer hier hinein</div><div class="guideArrow">↘️</div></div>
 </div>
 <canvas id="canvas" hidden></canvas>
 <canvas id="preview" class="preview" style="display:none"></canvas>
@@ -60,7 +60,8 @@ body{padding-bottom:92px}
 <button class="secondary" id="closeCam">Schließen</button>
 </div>
 <div class="progress" id="prog"><div class="bar" id="bar"></div></div>
-<div id="status" class="hint">Speed-Test: Nur die Kartennummer unten rechts muss im blauen Rahmen liegen.</div>
+<div id="status" class="hint">Öffne die Kamera und bring die <b>untere rechte Kartenecke</b> in den blauen Rahmen.</div>
+<div id="cameraHelp" class="cameraHelp"><b>🎯 Kameraführung 0.5.3</b><div class="cameraSteps"><div class="cameraStep"><strong>1.</strong> Karte möglichst groß zeigen</div><div class="cameraStep"><strong>2.</strong> OP/EB/ST-Nummer in den Rahmen</div><div class="cameraStep"><strong>3.</strong> Kurz ruhig halten, dann scannen</div></div></div>
 <div id="diag" class="hint" style="margin-top:5px;color:#73dda7">Diagnose: App bereit.</div>
 </section>
 
@@ -108,7 +109,7 @@ function normalize(text){
 
   const compact=raw.replace(/\s+/g,' ');
 
-  // 0.5.2: typische OP-Präfix-Fehler inklusive OR/0R.
+  // 0.5.3: typische OP-Präfix-Fehler inklusive OR/0R bleiben erhalten.
   // Beispiel: "or16-07208" -> "OP16-072".
   const opPatterns=[
     /OP[^0-9OILSBZG]{0,4}([0-9OILSBZG]{2})[^0-9OILSBZG]{0,4}([0-9OILSBZG]{3})/,
@@ -178,7 +179,8 @@ async function startCam(){
     $('camBtns').style.display='flex';
     $('guide').style.display='block';
     $('stickyScan').style.display='block';
-    setStatus('Kamera läuft. Bring die Kartennummer unten rechts ungefähr in den gut sichtbaren blauen Rahmen.');
+    $('cameraHelp').style.display='block';
+    setStatus('Kamera läuft. Richte die untere rechte Kartenecke so aus, dass die komplette Kartennummer gut lesbar im blauen Rahmen liegt.');
     diag('Kamera geöffnet ✅');
   }catch(e){
     console.error(e);
@@ -188,7 +190,7 @@ async function startCam(){
 }
 function stopCam(){
   if(stream)stream.getTracks().forEach(t=>t.stop());
-  stream=null;$('camBtns').style.display='none';$('guide').style.display='none';$('stickyScan').style.display='none';
+  stream=null;$('camBtns').style.display='none';$('guide').style.display='none';$('stickyScan').style.display='none';$('cameraHelp').style.display='none';
 }
 function resetDetected(){
   $('number').value=''; $('set').value=''; $('lookup').textContent='';
@@ -215,7 +217,7 @@ function makeCrop(sourceCanvas,x,y,w,h,scale=4,mode='contrast'){
 async function ocrCanvas(c,label,baseProgress){
   preview.width=c.width; preview.height=c.height;
   preview.getContext('2d').drawImage(c,0,0); preview.style.display='block';
-  setStatus('OCR 0.5.2: '+label+' …'); diag('OCR läuft: '+label);
+  setStatus('OCR 0.5.3: '+label+' …'); diag('OCR läuft: '+label);
   const res=await Tesseract.recognize(c,'eng',{
     logger:m=>{if(m.progress)prog(true,Math.min(96,baseProgress+Math.round(m.progress*10)))}
   });
@@ -331,7 +333,7 @@ async function scanSource(sourceCanvas){
 
   try{
     const W=sourceCanvas.width, H=sourceCanvas.height;
-    setStatus('Sichere Mehrfachprüfung 0.5.2 läuft …');
+    setStatus('Sichere Mehrfachprüfung 0.5.3 läuft …');
 
     const guideRect=$('guide').getBoundingClientRect();
     const videoRect=video.getBoundingClientRect();

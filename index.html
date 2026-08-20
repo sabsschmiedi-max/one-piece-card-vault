@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1324">
-<title>One Piece Card Vault 0.4.5</title>
+<title>One Piece Card Vault 0.4.8</title>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{--bg:#0b1324;--panel:#121d33;--text:#f6f8fb;--muted:#9eabc0;--accent:#36baff;--ok:#73dda7}
 *{box-sizing:border-box}body{margin:0;background:#0b1324;color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.app{max-width:760px;margin:auto;padding:14px}
 h1{font-size:25px;margin:8px 0 2px}.sub,.hint{color:var(--muted);font-size:12px;line-height:1.45}.panel{background:var(--panel);border:1px solid #263a58;border-radius:16px;padding:14px;margin-top:12px}
-video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:5%;bottom:26%;width:44%;height:13%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
+video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWrap{position:relative}.guide{position:absolute;right:5%;bottom:38%;width:44%;height:13%;border:2px dashed #36baff;border-radius:8px;pointer-events:none;display:none}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}button{flex:1;min-width:130px;padding:11px;border:0;border-radius:11px;font-weight:800;font:inherit}.primary{background:var(--accent);color:#03101a}.secondary{background:#243655;color:white}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}label{display:block;font-size:11px;color:var(--muted);margin:0 0 4px 2px}input{width:100%;padding:11px;background:#0d172a;color:white;border:1px solid #324866;border-radius:11px;font:inherit}
 .progress{height:7px;background:#091321;border-radius:8px;overflow:hidden;margin-top:8px;display:none}.bar{height:100%;width:0;background:var(--accent)}
@@ -32,6 +32,7 @@ video,canvas.preview{width:100%;border-radius:12px;background:#050a12}.cameraWra
   background:#36baff;
   color:#03101a;
   box-shadow:0 10px 28px rgba(0,0,0,.35);
+  display:none;
 }
 body{padding-bottom:92px}
 
@@ -39,7 +40,7 @@ body{padding-bottom:92px}
 </head>
 <body><div class="app">
 <h1>🏴‍☠️ One Piece Card Vault</h1>
-<div class="sub">Version 0.4.7 · gezielte High-Res-Code-Erkennung</div>
+<div class="sub">Version 0.4.8 · höherer Zielrahmen + smarter Scan-Button</div>
 
 <section class="panel">
 <h2>📷 Scanner</h2>
@@ -172,6 +173,7 @@ async function startCam(){
     video.srcObject=stream;
     $('camBtns').style.display='flex';
     $('guide').style.display='block';
+    $('stickyScan').style.display='block';
     setStatus('Kamera läuft. Bring die Kartennummer unten rechts ungefähr in den gut sichtbaren blauen Rahmen.');
     diag('Kamera geöffnet ✅');
   }catch(e){
@@ -182,7 +184,7 @@ async function startCam(){
 }
 function stopCam(){
   if(stream)stream.getTracks().forEach(t=>t.stop());
-  stream=null;$('camBtns').style.display='none';$('guide').style.display='none';
+  stream=null;$('camBtns').style.display='none';$('guide').style.display='none';$('stickyScan').style.display='none';
 }
 function resetDetected(){
   $('number').value=''; $('set').value=''; $('lookup').textContent='';
